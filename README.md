@@ -1,20 +1,22 @@
-# Windows Speech-To-Text Dictation App
+# Speech-To-Text Dictation App
 
-This project is a small Windows desktop app written in Python. It listens to your microphone, streams audio to Google Cloud Speech-to-Text, and types finalized transcripts into whichever Windows app is currently focused.
+This project is a small desktop app written in Python. It records your speech between explicit manual start and stop actions, sends the captured utterance to a speech-to-text provider, and types the finalized transcript into whichever app is currently focused.
 
 ## What It Does
 
 - Uses your Windows microphone as the audio source.
-- Streams audio to Google Cloud Speech-to-Text V2.
-- Shows interim and final transcripts in a local control window.
+- Uses explicit manual start/stop recording instead of silence-based auto-stop.
+- Supports a Windows global hotkey toggle for start/stop recording.
+- Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
+- Shows finalized transcripts in a local control window.
 - Types final transcript text into the active application, such as Windows Terminal, VS Code, Word, or a browser text field.
 
 ## Requirements
 
 - Windows
 - Python 3.11+ installed and available on `PATH`
-- A Google Cloud project with Speech-to-Text enabled
-- Application Default Credentials or a service account key
+- For GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
+- For OpenAI mode: an `OPENAI_API_KEY`
 
 ## Setup
 
@@ -37,7 +39,9 @@ This project is a small Windows desktop app written in Python. It listens to you
    pip install -e .
    ```
 
-5. Authenticate with Google Cloud. Either:
+5. Choose a provider.
+
+   For Google Cloud:
 
    ```powershell
    gcloud auth application-default login
@@ -49,16 +53,32 @@ This project is a small Windows desktop app written in Python. It listens to you
    $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
    ```
 
-6. Set your project ID:
+6. Set your provider-specific environment.
+
+   For Google Cloud:
 
    ```powershell
+   $env:SPEECH_PROVIDER="gcp"
    $env:GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
    ```
 
-7. Optional: set the Speech-to-Text location. `chirp_3` should use a supported regional location such as `us`.
+   Optional: set the Speech-to-Text location. `chirp_3` should use a supported regional location such as `us`.
 
    ```powershell
    $env:GOOGLE_CLOUD_LOCATION="us"
+   ```
+
+   Optional: set the global hotkey. Default is `ctrl+alt+space`.
+
+   ```powershell
+   $env:DICTATION_HOTKEY="ctrl+alt+space"
+   ```
+
+   For OpenAI:
+
+   ```powershell
+   $env:SPEECH_PROVIDER="openai"
+   $env:OPENAI_API_KEY="your-openai-api-key"
    ```
 
 ## Run
@@ -66,6 +86,7 @@ This project is a small Windows desktop app written in Python. It listens to you
 Set your project ID in the current shell, then start the app:
 
 ```powershell
+$env:SPEECH_PROVIDER="gcp"
 $env:GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 .\run.ps1
 ```
@@ -83,6 +104,14 @@ If you prefer not to set environment variables, you can pass the project directl
 .\run.ps1 -ProjectId your-gcp-project-id
 ```
 
+OpenAI example:
+
+```powershell
+$env:SPEECH_PROVIDER="openai"
+$env:OPENAI_API_KEY="your-openai-api-key"
+.\run.ps1 -Provider openai
+```
+
 Optional location override:
 
 ```powershell
@@ -98,20 +127,23 @@ Smoke test without opening the UI:
 ## How To Use
 
 1. Launch the app.
-2. Confirm the project ID, language, and model.
-3. Click `Start Listening`.
-4. Click into the target app where text should appear.
-5. Speak into your microphone.
-6. Click `Stop` in the app to end dictation.
+2. Confirm the provider, project ID if using GCP, language, and model.
+3. Click into the target app where text should appear.
+4. Click `Start Recording` or press the global hotkey.
+5. Speak your full prompt, including long pauses if needed.
+6. Click `Stop And Transcribe` or press the global hotkey again.
 
-The app only injects finalized recognition results. Interim text is displayed in the UI but not typed into the target application.
+The app only injects finalized transcription results. It does not auto-stop on silence.
 
 ## Notes
 
-- The default model is `chirp_3`.
-- The default location is `us`.
+- The default provider is `gcp`.
+- The default GCP model is `chirp_3`.
+- The default OpenAI model is `gpt-4o-mini-transcribe`.
+- The default GCP location is `us`.
 - The app uses Unicode keyboard events, so it can type into most Windows applications without requiring app-specific integrations.
-- Google Cloud streaming requests have tight per-message audio size limits. This app sends short PCM chunks to stay within those limits.
+- The GCP backend transcribes one recorded utterance at a time.
+- The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
 
 ## Project Layout
 
@@ -122,7 +154,8 @@ src/
     __main__.py
     audio.py
     config.py
-    injector.py
+    injectors/
     recognizer.py
+    providers/
     ui.py
 ```

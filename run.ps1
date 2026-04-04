@@ -1,4 +1,5 @@
 param(
+    [string]$Provider = "",
     [string]$ProjectId = "",
     [string]$Location = "us",
     [switch]$SmokeTest
@@ -16,11 +17,21 @@ if (-not (Test-Path -LiteralPath $activateScript)) {
 
 . $activateScript
 
-if (-not $ProjectId) {
+if (-not $Provider) {
+    $Provider = $env:SPEECH_PROVIDER
+}
+
+if (-not $Provider) {
+    $Provider = "gcp"
+}
+
+$env:SPEECH_PROVIDER = $Provider
+
+if ($Provider -eq "gcp" -and -not $ProjectId) {
     $ProjectId = $env:GOOGLE_CLOUD_PROJECT
 }
 
-if (-not $ProjectId) {
+if ($Provider -eq "gcp" -and -not $ProjectId) {
     throw (
         "Project ID is required. Set GOOGLE_CLOUD_PROJECT first, for example:`n`n" +
         '$env:GOOGLE_CLOUD_PROJECT="your-gcp-project-id"' +
@@ -35,6 +46,7 @@ $env:GOOGLE_CLOUD_LOCATION = $Location
 
 if ($SmokeTest) {
     Write-Output ("VIRTUAL_ENV=" + $env:VIRTUAL_ENV)
+    Write-Output ("SPEECH_PROVIDER=" + $env:SPEECH_PROVIDER)
     Write-Output ("GOOGLE_CLOUD_PROJECT=" + $env:GOOGLE_CLOUD_PROJECT)
     Write-Output ("GOOGLE_CLOUD_LOCATION=" + $env:GOOGLE_CLOUD_LOCATION)
     python -c "import sys; import speech_to_text_app; print(sys.executable)"
