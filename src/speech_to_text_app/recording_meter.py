@@ -6,6 +6,7 @@ import tkinter as tk
 class RecordingMeter:
     def __init__(self, parent: tk.Widget) -> None:
         self._level = 0.0
+        self._noise_floor = 0.055
         self._gain = 3.8
         self._attack = 0.7
         self._release = 0.25
@@ -49,7 +50,13 @@ class RecordingMeter:
         if not self._visible:
             return
 
-        boosted = min(1.0, max(0.0, level) * self._gain)
+        raw_level = max(0.0, level)
+        if raw_level <= self._noise_floor:
+            normalized = 0.0
+        else:
+            normalized = (raw_level - self._noise_floor) / (1.0 - self._noise_floor)
+
+        boosted = min(1.0, normalized * self._gain)
         target = boosted**0.6
         blend = self._attack if target >= self._level else self._release
         self._level = self._level + (target - self._level) * blend
