@@ -13,7 +13,6 @@ class AppConfig:
     recognizer_location: str = "us"
     recognizer_id: str = "_"
     openai_api_key: str = ""
-    openai_chunk_seconds: float = 4.0
     sample_rate_hz: int = 16_000
     chunk_ms: int = 100
     append_trailing_space: bool = True

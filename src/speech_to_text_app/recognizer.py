@@ -6,10 +6,10 @@ from collections.abc import Callable
 
 from google.api_core import exceptions as google_exceptions
 
-from .audio import MicrophoneStream
+from .audio import ManualAudioRecorder
 from .config import AppConfig
 from .injectors import TextInjector
-from .providers import SpeechProvider, TranscriptEvent, build_speech_provider
+from .providers import SpeechProvider, build_speech_provider
 
 
 LOGGER = logging.getLogger(__name__)
@@ -19,93 +19,75 @@ StatusCallback = Callable[[str], None]
 TextCallback = Callable[[str], None]
 
 
-class StreamingDictationSession:
+class ManualDictationSession:
     def __init__(
         self,
         config: AppConfig,
         injector: TextInjector,
         provider: SpeechProvider | None = None,
         on_status: StatusCallback | None = None,
-        on_interim: TextCallback | None = None,
         on_final: TextCallback | None = None,
     ) -> None:
         self.config = config
         self.injector = injector
         self.provider = provider or build_speech_provider(config)
         self.on_status = on_status or (lambda _message: None)
-        self.on_interim = on_interim or (lambda _text: None)
         self.on_final = on_final or (lambda _text: None)
 
-        self._stop_event = threading.Event()
-        self._thread: threading.Thread | None = None
-        self._microphone: MicrophoneStream | None = None
+        self._recorder: ManualAudioRecorder | None = None
+        self._transcription_thread: threading.Thread | None = None
 
     @property
-    def running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
+    def recording(self) -> bool:
+        return self._recorder is not None and self._recorder.recording
 
-    def start(self) -> None:
-        if self.running:
+    @property
+    def transcribing(self) -> bool:
+        return self._transcription_thread is not None and self._transcription_thread.is_alive()
+
+    def start_recording(self) -> None:
+        if self.recording or self.transcribing:
             return
 
-        self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="speech-to-text-session",
+        self._recorder = ManualAudioRecorder(
+            sample_rate_hz=self.config.sample_rate_hz,
+            chunk_ms=self.config.chunk_ms,
+        )
+        self._recorder.start()
+        self.on_status("Recording. Press Stop when your utterance is complete.")
+
+    def stop_recording(self) -> None:
+        if not self.recording or self._recorder is None:
+            return
+
+        audio_bytes = self._recorder.stop()
+        self._recorder = None
+
+        if not audio_bytes:
+            self.on_status("No audio captured.")
+            return
+
+        self.on_status("Transcribing...")
+        self._transcription_thread = threading.Thread(
+            target=self._transcribe_and_inject,
+            args=(audio_bytes,),
+            name="speech-to-text-transcription",
             daemon=True,
         )
-        self._thread.start()
+        self._transcription_thread.start()
 
-    def stop(self) -> None:
-        self._stop_event.set()
+    def close(self) -> None:
+        if self._recorder is not None:
+            self._recorder.close()
+            self._recorder = None
 
-        if self._microphone is not None:
-            self._microphone.close()
-
-        if self._thread is not None:
-            self._thread.join(timeout=5)
-
-    def _run(self) -> None:
-        self.on_status("Connecting to microphone...")
-
+    def _transcribe_and_inject(self, audio_bytes: bytes) -> None:
         try:
-            self._microphone = MicrophoneStream(
-                sample_rate_hz=self.config.sample_rate_hz,
-                chunk_ms=self.config.chunk_ms,
-            )
-            self._microphone.start()
-            self.on_status("Listening. Click into the target app to receive text.")
+            transcript = self.provider.transcribe_audio(audio_bytes).strip()
+            if not transcript:
+                self.on_status("No speech detected.")
+                return
 
-            audio_chunks = self._microphone.read_chunks(self._stop_event)
-            for event in self.provider.transcribe_stream(audio_chunks):
-                if self._stop_event.is_set():
-                    break
-
-                self._handle_event(event)
-
-            if self._stop_event.is_set():
-                self.on_status("Stopped.")
-            else:
-                self.on_status("Recognition stream ended.")
-
-        except google_exceptions.GoogleAPICallError as error:
-            LOGGER.exception("Google API error during dictation.")
-            message = getattr(error, "message", None) or str(error)
-            self.on_status(f"Speech provider error: {message}")
-        except Exception as error:  # noqa: BLE001
-            LOGGER.exception("Unexpected error during dictation.")
-            self.on_status(f"Error: {error}")
-        finally:
-            if self._microphone is not None:
-                self._microphone.close()
-                self._microphone = None
-
-    def _handle_event(self, event: TranscriptEvent) -> None:
-        transcript = event.text.strip()
-        if not transcript:
-            return
-
-        if event.is_final:
             committed_text = transcript
             if self.config.append_trailing_space and not committed_text.endswith(
                 (" ", "\n", "\t")
@@ -117,6 +99,14 @@ class StreamingDictationSession:
                 self.injector.type_text(committed_text)
             except OSError as error:
                 self.on_status(f"Typing failed: {error}")
-            self.on_interim("")
-        else:
-            self.on_interim(transcript)
+                return
+
+            self.on_status("Transcription inserted.")
+
+        except google_exceptions.GoogleAPICallError as error:
+            LOGGER.exception("Speech provider error during dictation.")
+            message = getattr(error, "message", None) or str(error)
+            self.on_status(f"Speech provider error: {message}")
+        except Exception as error:  # noqa: BLE001
+            LOGGER.exception("Unexpected error during dictation.")
+            self.on_status(f"Error: {error}")

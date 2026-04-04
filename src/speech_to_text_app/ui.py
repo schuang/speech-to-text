@@ -7,7 +7,7 @@ from tkinter import messagebox, ttk
 
 from .config import AppConfig
 from .injectors import WindowsTextInjector
-from .recognizer import StreamingDictationSession
+from .recognizer import ManualDictationSession
 
 
 class DictationApp(tk.Tk):
@@ -24,10 +24,9 @@ class DictationApp(tk.Tk):
         self.model_var = tk.StringVar(value=default_config.resolved_model)
         self.location_var = tk.StringVar(value=default_config.recognizer_location)
         self.status_var = tk.StringVar(value="Idle")
-        self.interim_var = tk.StringVar(value="")
 
         self._events: queue.Queue[tuple[str, str]] = queue.Queue()
-        self._session: StreamingDictationSession | None = None
+        self._session: ManualDictationSession | None = None
 
         self._build_widgets()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -80,12 +79,15 @@ class DictationApp(tk.Tk):
         button_row.grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         self.start_button = ttk.Button(
-            button_row, text="Start Listening", command=self._start_session
+            button_row, text="Start Recording", command=self._start_session
         )
         self.start_button.grid(row=0, column=0, padx=(0, 8))
 
         self.stop_button = ttk.Button(
-            button_row, text="Stop", command=self._stop_session, state="disabled"
+            button_row,
+            text="Stop And Transcribe",
+            command=self._stop_session,
+            state="disabled",
         )
         self.stop_button.grid(row=0, column=1, padx=(0, 8))
 
@@ -101,8 +103,9 @@ class DictationApp(tk.Tk):
         ttk.Label(
             content,
             text=(
-                "Usage: click Start Listening, then click into the target app. "
-                "Final transcripts are typed into the active window."
+                "Usage: click Start Recording, speak your full prompt or paragraph, "
+                "then click Stop And Transcribe. Final transcript text is typed into "
+                "the active window."
             ),
             wraplength=700,
             justify="left",
@@ -113,26 +116,16 @@ class DictationApp(tk.Tk):
             row=2, column=0, sticky="w", pady=(0, 12)
         )
 
-        transcript_frame = ttk.LabelFrame(content, text="Live Transcript Preview")
+        transcript_frame = ttk.LabelFrame(content, text="Captured Transcript")
         transcript_frame.grid(row=3, column=0, sticky="nsew")
         transcript_frame.columnconfigure(0, weight=1)
-        transcript_frame.rowconfigure(1, weight=1)
-
-        ttk.Label(transcript_frame, text="Interim").grid(
-            row=0, column=0, sticky="w", padx=12, pady=(12, 4)
-        )
-        ttk.Label(
-            transcript_frame,
-            textvariable=self.interim_var,
-            wraplength=680,
-            justify="left",
-        ).grid(row=1, column=0, sticky="new", padx=12, pady=(0, 12))
+        transcript_frame.rowconfigure(0, weight=1)
 
         ttk.Label(transcript_frame, text="Final Text Sent").grid(
-            row=2, column=0, sticky="w", padx=12, pady=(0, 4)
+            row=0, column=0, sticky="w", padx=12, pady=(12, 4)
         )
         self.final_text = tk.Text(transcript_frame, height=10, wrap="word")
-        self.final_text.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self.final_text.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self.final_text.configure(state="disabled")
 
     def _start_session(self) -> None:
@@ -168,27 +161,24 @@ class DictationApp(tk.Tk):
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         )
 
-        self._session = StreamingDictationSession(
+        self._session = ManualDictationSession(
             config=config,
             injector=WindowsTextInjector(),
             on_status=lambda message: self._events.put(("status", message)),
-            on_interim=lambda text: self._events.put(("interim", text)),
             on_final=lambda text: self._events.put(("final", text)),
         )
-        self._session.start()
+        self._session.start_recording()
 
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
-        self.status_var.set("Starting...")
+        self.status_var.set("Starting recording...")
 
     def _stop_session(self) -> None:
         if self._session is not None:
-            self._session.stop()
-            self._session = None
+            self._session.stop_recording()
 
-        self.start_button.configure(state="normal")
         self.stop_button.configure(state="disabled")
-        self.status_var.set("Stopped.")
+        self.status_var.set("Stopping recording...")
 
     def _pump_events(self) -> None:
         while True:
@@ -199,16 +189,17 @@ class DictationApp(tk.Tk):
 
             if event_type == "status":
                 self.status_var.set(payload)
-                if payload in {"Stopped.", "Recognition stream ended."} or payload.startswith(
-                    "Error:"
-                ) or payload.startswith("Google Cloud error:") or payload.startswith(
+                if payload in {
+                    "No audio captured.",
+                    "No speech detected.",
+                    "Transcription inserted.",
+                } or payload.startswith("Error:") or payload.startswith(
                     "Speech provider error:"
                 ) or payload.startswith("Typing failed:"):
                     self.start_button.configure(state="normal")
                     self.stop_button.configure(state="disabled")
-                    self._session = None
-            elif event_type == "interim":
-                self.interim_var.set(payload)
+                    if self._session is not None and not self._session.recording:
+                        self._session = None
             elif event_type == "final":
                 self._append_final_text(payload)
 
@@ -221,7 +212,9 @@ class DictationApp(tk.Tk):
         self.final_text.configure(state="disabled")
 
     def _on_close(self) -> None:
-        self._stop_session()
+        if self._session is not None:
+            self._session.close()
+            self._session = None
         self.destroy()
 
 

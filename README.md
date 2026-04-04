@@ -1,12 +1,13 @@
 # Speech-To-Text Dictation App
 
-This project is a small desktop app written in Python. It listens to your microphone, sends audio to a speech-to-text provider, and types finalized transcripts into whichever app is currently focused.
+This project is a small desktop app written in Python. It records your speech between explicit manual start and stop actions, sends the captured utterance to a speech-to-text provider, and types the finalized transcript into whichever app is currently focused.
 
 ## What It Does
 
 - Uses your Windows microphone as the audio source.
+- Uses explicit manual start/stop recording instead of silence-based auto-stop.
 - Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
-- Shows interim and final transcripts in a local control window.
+- Shows finalized transcripts in a local control window.
 - Types final transcript text into the active application, such as Windows Terminal, VS Code, Word, or a browser text field.
 
 ## Requirements
@@ -120,12 +121,12 @@ Smoke test without opening the UI:
 
 1. Launch the app.
 2. Confirm the provider, project ID if using GCP, language, and model.
-3. Click `Start Listening`.
-4. Click into the target app where text should appear.
-5. Speak into your microphone.
-6. Click `Stop` in the app to end dictation.
+3. Click into the target app where text should appear.
+4. Click `Start Recording`.
+5. Speak your full prompt, including long pauses if needed.
+6. Click `Stop And Transcribe`.
 
-The app only injects finalized recognition results. Interim text is displayed in the UI but not typed into the target application.
+The app only injects finalized transcription results. It does not auto-stop on silence.
 
 ## Notes
 
@@ -134,8 +135,8 @@ The app only injects finalized recognition results. Interim text is displayed in
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
 - The default GCP location is `us`.
 - The app uses Unicode keyboard events, so it can type into most Windows applications without requiring app-specific integrations.
-- The GCP backend uses streaming recognition.
-- The OpenAI backend currently uploads short WAV chunks and emits finalized transcripts only.
+- The GCP backend transcribes one recorded utterance at a time.
+- The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
 
 ## Project Layout
 
