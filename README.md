@@ -20,6 +20,7 @@ This project is a small desktop app written in Python. It records your speech be
 - For Linux text injection:
   - `xdotool` on X11, or
   - `wtype` on Wayland
+- For Linux audio capture with `sounddevice`: PortAudio must be installed at the system level
 
 ## Setup
 
@@ -44,10 +45,24 @@ This project is a small desktop app written in Python. It records your speech be
    source .venv/bin/activate
    ```
 
+   If you are sharing the same checkout between Windows and WSL/Linux, you may prefer a separate Linux virtual environment name:
+
+   ```bash
+   python3 -m venv .venv-linux
+   source .venv-linux/bin/activate
+   ```
+
 4. Install dependencies from the activated virtual environment:
 
    ```powershell
    pip install -e .
+   ```
+
+   On Ubuntu or Debian-based Linux systems, install the native runtime dependencies first:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y libportaudio2 python3-tk xdotool wtype
    ```
 
 5. Choose a provider.
@@ -109,6 +124,13 @@ Linux:
 ```bash
 export SPEECH_PROVIDER="gcp"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+./run.sh
+```
+
+If your Linux virtual environment is not named `.venv`, set `VIRTUAL_ENV_DIR` first:
+
+```bash
+export VIRTUAL_ENV_DIR=".venv-linux"
 ./run.sh
 ```
 

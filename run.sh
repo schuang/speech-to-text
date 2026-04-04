@@ -3,12 +3,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [[ ! -f ".venv/bin/activate" ]]; then
-  echo "Virtual environment not found at .venv/bin/activate" >&2
+venv_dir="${VIRTUAL_ENV_DIR:-.venv}"
+activate_script="$venv_dir/bin/activate"
+
+if [[ ! -f "$activate_script" ]]; then
+  echo "Virtual environment not found at $activate_script" >&2
   exit 1
 fi
 
-source .venv/bin/activate
+source "$activate_script"
 
 provider="${SPEECH_PROVIDER:-gcp}"
 export SPEECH_PROVIDER="$provider"

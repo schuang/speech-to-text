@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from google.api_core import exceptions as google_exceptions
 
-from .audio import ManualAudioRecorder
+from .audio import AudioRecorderError, ManualAudioRecorder
 from .config import AppConfig
 from .injectors import TextInjector
 from .providers import SpeechProvider, build_speech_provider
@@ -53,14 +53,24 @@ class ManualDictationSession:
             sample_rate_hz=self.config.sample_rate_hz,
             chunk_ms=self.config.chunk_ms,
         )
-        self._recorder.start()
+        try:
+            self._recorder.start()
+        except AudioRecorderError as error:
+            self._recorder = None
+            self.on_status(f"Error: {error}")
+            return
         self.on_status("Recording. Press Stop when your utterance is complete.")
 
     def stop_recording(self) -> None:
         if not self.recording or self._recorder is None:
             return
 
-        audio_bytes = self._recorder.stop()
+        try:
+            audio_bytes = self._recorder.stop()
+        except AudioRecorderError as error:
+            self._recorder = None
+            self.on_status(f"Error: {error}")
+            return
         self._recorder = None
 
         if not audio_bytes:
