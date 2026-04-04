@@ -10,6 +10,7 @@ class AppConfig:
     project_id: str = ""
     language_code: str = "en-US"
     model: str = "chirp_3"
+    hotkey: str = "ctrl+alt+space"
     recognizer_location: str = "us"
     recognizer_id: str = "_"
     openai_api_key: str = ""
@@ -54,6 +55,7 @@ class AppConfig:
     def from_env(cls) -> "AppConfig":
         provider = os.getenv("SPEECH_PROVIDER", "gcp").strip().lower() or "gcp"
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+        hotkey = os.getenv("DICTATION_HOTKEY", "ctrl+alt+space").strip() or "ctrl+alt+space"
         recognizer_location = os.getenv("GOOGLE_CLOUD_LOCATION", "us").strip() or "us"
         openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
         default_model = "gpt-4o-mini-transcribe" if provider == "openai" else "chirp_3"
@@ -61,6 +63,7 @@ class AppConfig:
             provider=provider,
             project_id=project_id,
             model=default_model,
+            hotkey=hotkey,
             recognizer_location=recognizer_location,
             openai_api_key=openai_api_key,
         )

@@ -6,6 +6,7 @@ This project is a small desktop app written in Python. It records your speech be
 
 - Uses your Windows microphone as the audio source.
 - Uses explicit manual start/stop recording instead of silence-based auto-stop.
+- Supports a Windows global hotkey toggle for start/stop recording.
 - Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
 - Shows finalized transcripts in a local control window.
 - Types final transcript text into the active application, such as Windows Terminal, VS Code, Word, or a browser text field.
@@ -67,6 +68,12 @@ This project is a small desktop app written in Python. It records your speech be
    $env:GOOGLE_CLOUD_LOCATION="us"
    ```
 
+   Optional: set the global hotkey. Default is `ctrl+alt+space`.
+
+   ```powershell
+   $env:DICTATION_HOTKEY="ctrl+alt+space"
+   ```
+
    For OpenAI:
 
    ```powershell
@@ -122,9 +129,9 @@ Smoke test without opening the UI:
 1. Launch the app.
 2. Confirm the provider, project ID if using GCP, language, and model.
 3. Click into the target app where text should appear.
-4. Click `Start Recording`.
+4. Click `Start Recording` or press the global hotkey.
 5. Speak your full prompt, including long pauses if needed.
-6. Click `Stop And Transcribe`.
+6. Click `Stop And Transcribe` or press the global hotkey again.
 
 The app only injects finalized transcription results. It does not auto-stop on silence.
 

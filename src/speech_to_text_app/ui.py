@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .config import AppConfig
+from .hotkeys import WindowsHotkeyError, WindowsHotkeyListener
 from .injectors import WindowsTextInjector
 from .recognizer import ManualDictationSession
 
@@ -22,13 +23,16 @@ class DictationApp(tk.Tk):
         self.project_id_var = tk.StringVar(value=default_config.project_id)
         self.language_var = tk.StringVar(value=default_config.language_code)
         self.model_var = tk.StringVar(value=default_config.resolved_model)
+        self.hotkey_var = tk.StringVar(value=default_config.hotkey)
         self.location_var = tk.StringVar(value=default_config.recognizer_location)
         self.status_var = tk.StringVar(value="Idle")
 
         self._events: queue.Queue[tuple[str, str]] = queue.Queue()
         self._session: ManualDictationSession | None = None
+        self._hotkey_listener: WindowsHotkeyListener | None = None
 
         self._build_widgets()
+        self._start_hotkey_listener()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(100, self._pump_events)
 
@@ -75,8 +79,15 @@ class DictationApp(tk.Tk):
             row=4, column=1, sticky="ew", pady=(0, 8)
         )
 
+        ttk.Label(config_frame, text="Global Hotkey").grid(
+            row=5, column=0, sticky="w", pady=(0, 8)
+        )
+        ttk.Entry(config_frame, textvariable=self.hotkey_var).grid(
+            row=5, column=1, sticky="ew", pady=(0, 8)
+        )
+
         button_row = ttk.Frame(config_frame)
-        button_row.grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        button_row.grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         self.start_button = ttk.Button(
             button_row, text="Start Recording", command=self._start_session
@@ -104,8 +115,8 @@ class DictationApp(tk.Tk):
             content,
             text=(
                 "Usage: click Start Recording, speak your full prompt or paragraph, "
-                "then click Stop And Transcribe. Final transcript text is typed into "
-                "the active window."
+                "then click Stop And Transcribe. The global hotkey also toggles start "
+                "and stop. Final transcript text is typed into the active window."
             ),
             wraplength=700,
             justify="left",
@@ -129,6 +140,9 @@ class DictationApp(tk.Tk):
         self.final_text.configure(state="disabled")
 
     def _start_session(self) -> None:
+        if self._session is not None and (self._session.recording or self._session.transcribing):
+            return
+
         provider = self.provider_var.get().strip().lower() or "gcp"
         if provider not in {"gcp", "openai"}:
             messagebox.showerror(
@@ -157,6 +171,7 @@ class DictationApp(tk.Tk):
             language_code=self.language_var.get().strip() or "en-US",
             model=self.model_var.get().strip()
             or ("gpt-4o-mini-transcribe" if provider == "openai" else "chirp_3"),
+            hotkey=self.hotkey_var.get().strip() or "ctrl+alt+space",
             recognizer_location=self.location_var.get().strip() or "us",
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         )
@@ -200,6 +215,8 @@ class DictationApp(tk.Tk):
                     self.stop_button.configure(state="disabled")
                     if self._session is not None and not self._session.recording:
                         self._session = None
+            elif event_type == "toggle":
+                self._toggle_recording()
             elif event_type == "final":
                 self._append_final_text(payload)
 
@@ -211,7 +228,34 @@ class DictationApp(tk.Tk):
         self.final_text.see("end")
         self.final_text.configure(state="disabled")
 
+    def _toggle_recording(self) -> None:
+        if self._session is not None and self._session.recording:
+            self._stop_session()
+            return
+
+        if self._session is not None and self._session.transcribing:
+            self.status_var.set("Transcription still in progress.")
+            return
+
+        self._start_session()
+
+    def _start_hotkey_listener(self) -> None:
+        hotkey = self.hotkey_var.get().strip() or "ctrl+alt+space"
+        try:
+            self._hotkey_listener = WindowsHotkeyListener(
+                hotkey=hotkey,
+                callback=lambda: self._events.put(("toggle", "")),
+            )
+            self._hotkey_listener.start()
+            self.status_var.set(f"Idle. Hotkey ready: {hotkey}")
+        except WindowsHotkeyError as error:
+            self._hotkey_listener = None
+            self.status_var.set(f"Hotkey unavailable: {error}")
+
     def _on_close(self) -> None:
+        if self._hotkey_listener is not None:
+            self._hotkey_listener.stop()
+            self._hotkey_listener = None
         if self._session is not None:
             self._session.close()
             self._session = None
