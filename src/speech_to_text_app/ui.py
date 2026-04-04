@@ -6,8 +6,8 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .config import AppConfig
-from .hotkeys import WindowsHotkeyError, WindowsHotkeyListener
-from .injectors import WindowsTextInjector
+from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
+from .injectors import TextInjectorError, build_text_injector
 from .recognizer import ManualDictationSession
 
 
@@ -29,7 +29,7 @@ class DictationApp(tk.Tk):
 
         self._events: queue.Queue[tuple[str, str]] = queue.Queue()
         self._session: ManualDictationSession | None = None
-        self._hotkey_listener: WindowsHotkeyListener | None = None
+        self._hotkey_listener: HotkeyListener | None = None
 
         self._build_widgets()
         self._start_hotkey_listener()
@@ -116,7 +116,8 @@ class DictationApp(tk.Tk):
             text=(
                 "Usage: click Start Recording, speak your full prompt or paragraph, "
                 "then click Stop And Transcribe. The global hotkey also toggles start "
-                "and stop. Final transcript text is typed into the active window."
+                "and stop where supported. Final transcript text is typed into the "
+                "active window."
             ),
             wraplength=700,
             justify="left",
@@ -176,9 +177,15 @@ class DictationApp(tk.Tk):
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         )
 
+        try:
+            injector = build_text_injector(delay_seconds=config.typing_delay_seconds)
+        except TextInjectorError as error:
+            messagebox.showerror("Injector unavailable", str(error))
+            return
+
         self._session = ManualDictationSession(
             config=config,
-            injector=WindowsTextInjector(),
+            injector=injector,
             on_status=lambda message: self._events.put(("status", message)),
             on_final=lambda text: self._events.put(("final", text)),
         )
@@ -242,13 +249,12 @@ class DictationApp(tk.Tk):
     def _start_hotkey_listener(self) -> None:
         hotkey = self.hotkey_var.get().strip() or "ctrl+alt+space"
         try:
-            self._hotkey_listener = WindowsHotkeyListener(
-                hotkey=hotkey,
-                callback=lambda: self._events.put(("toggle", "")),
+            self._hotkey_listener = build_hotkey_listener(
+                hotkey=hotkey, callback=lambda: self._events.put(("toggle", ""))
             )
             self._hotkey_listener.start()
             self.status_var.set(f"Idle. Hotkey ready: {hotkey}")
-        except WindowsHotkeyError as error:
+        except HotkeyError as error:
             self._hotkey_listener = None
             self.status_var.set(f"Hotkey unavailable: {error}")
 
