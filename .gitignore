@@ -1,0 +1,21 @@
+.venv/
+.tmp/
+.pip-cache/
+.virtualenv-appdata/
+
+# Python cache and packaging artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# Local tooling and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
