@@ -10,7 +10,7 @@ from ..config import AppConfig
 from .base import TranscriptEvent
 
 
-class GcpSpeechProvider:
+class GcpStreamingProvider:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
 
@@ -37,7 +37,7 @@ class GcpSpeechProvider:
                 audio_channel_count=1,
             ),
             language_codes=[self.config.language_code],
-            model=self.config.model,
+            model=self.config.resolved_model,
         )
         streaming_config = cloud_speech_types.StreamingRecognitionConfig(
             config=recognition_config,

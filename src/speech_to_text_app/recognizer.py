@@ -8,8 +8,8 @@ from google.api_core import exceptions as google_exceptions
 
 from .audio import MicrophoneStream
 from .config import AppConfig
-from .injectors import TextInjector, WindowsTextInjector
-from .providers import GcpSpeechProvider, SpeechProvider, TranscriptEvent
+from .injectors import TextInjector
+from .providers import SpeechProvider, TranscriptEvent, build_speech_provider
 
 
 LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class StreamingDictationSession:
     ) -> None:
         self.config = config
         self.injector = injector
-        self.provider = provider or GcpSpeechProvider(config)
+        self.provider = provider or build_speech_provider(config)
         self.on_status = on_status or (lambda _message: None)
         self.on_interim = on_interim or (lambda _text: None)
         self.on_final = on_final or (lambda _text: None)
@@ -91,7 +91,7 @@ class StreamingDictationSession:
         except google_exceptions.GoogleAPICallError as error:
             LOGGER.exception("Google API error during dictation.")
             message = getattr(error, "message", None) or str(error)
-            self.on_status(f"Google Cloud error: {message}")
+            self.on_status(f"Speech provider error: {message}")
         except Exception as error:  # noqa: BLE001
             LOGGER.exception("Unexpected error during dictation.")
             self.on_status(f"Error: {error}")

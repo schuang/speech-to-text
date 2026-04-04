@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import queue
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -17,9 +18,10 @@ class DictationApp(tk.Tk):
         self.minsize(680, 460)
 
         default_config = AppConfig.from_env()
+        self.provider_var = tk.StringVar(value=default_config.provider)
         self.project_id_var = tk.StringVar(value=default_config.project_id)
         self.language_var = tk.StringVar(value=default_config.language_code)
-        self.model_var = tk.StringVar(value=default_config.model)
+        self.model_var = tk.StringVar(value=default_config.resolved_model)
         self.location_var = tk.StringVar(value=default_config.recognizer_location)
         self.status_var = tk.StringVar(value="Idle")
         self.interim_var = tk.StringVar(value="")
@@ -39,36 +41,43 @@ class DictationApp(tk.Tk):
         config_frame.grid(row=0, column=0, sticky="ew")
         config_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(config_frame, text="Google Cloud Project ID").grid(
+        ttk.Label(config_frame, text="Provider").grid(
             row=0, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Entry(config_frame, textvariable=self.project_id_var).grid(
+        ttk.Entry(config_frame, textvariable=self.provider_var).grid(
             row=0, column=1, sticky="ew", pady=(0, 8)
         )
 
-        ttk.Label(config_frame, text="Language Code").grid(
+        ttk.Label(config_frame, text="Google Cloud Project ID (GCP only)").grid(
             row=1, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Entry(config_frame, textvariable=self.language_var).grid(
+        ttk.Entry(config_frame, textvariable=self.project_id_var).grid(
             row=1, column=1, sticky="ew", pady=(0, 8)
         )
 
-        ttk.Label(config_frame, text="Model").grid(
+        ttk.Label(config_frame, text="Language Code").grid(
             row=2, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Entry(config_frame, textvariable=self.model_var).grid(
+        ttk.Entry(config_frame, textvariable=self.language_var).grid(
             row=2, column=1, sticky="ew", pady=(0, 8)
         )
 
-        ttk.Label(config_frame, text="Location").grid(
+        ttk.Label(config_frame, text="Model").grid(
             row=3, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Entry(config_frame, textvariable=self.location_var).grid(
+        ttk.Entry(config_frame, textvariable=self.model_var).grid(
             row=3, column=1, sticky="ew", pady=(0, 8)
         )
 
+        ttk.Label(config_frame, text="Location (GCP only)").grid(
+            row=4, column=0, sticky="w", pady=(0, 8)
+        )
+        ttk.Entry(config_frame, textvariable=self.location_var).grid(
+            row=4, column=1, sticky="ew", pady=(0, 8)
+        )
+
         button_row = ttk.Frame(config_frame)
-        button_row.grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        button_row.grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         self.start_button = ttk.Button(
             button_row, text="Start Listening", command=self._start_session
@@ -127,19 +136,36 @@ class DictationApp(tk.Tk):
         self.final_text.configure(state="disabled")
 
     def _start_session(self) -> None:
+        provider = self.provider_var.get().strip().lower() or "gcp"
+        if provider not in {"gcp", "openai"}:
+            messagebox.showerror(
+                "Unsupported provider",
+                "Provider must be either 'gcp' or 'openai'.",
+            )
+            return
+
         project_id = self.project_id_var.get().strip()
-        if not project_id:
+        if provider == "gcp" and not project_id:
             messagebox.showerror(
                 "Missing project ID",
-                "Enter a Google Cloud project ID or set GOOGLE_CLOUD_PROJECT.",
+                "Enter a Google Cloud project ID or set GOOGLE_CLOUD_PROJECT for GCP mode.",
+            )
+            return
+        if provider == "openai" and not os.getenv("OPENAI_API_KEY", "").strip():
+            messagebox.showerror(
+                "Missing OpenAI API key",
+                "Set OPENAI_API_KEY before starting OpenAI mode.",
             )
             return
 
         config = AppConfig(
+            provider=provider,
             project_id=project_id,
             language_code=self.language_var.get().strip() or "en-US",
-            model=self.model_var.get().strip() or "chirp_3",
+            model=self.model_var.get().strip()
+            or ("gpt-4o-mini-transcribe" if provider == "openai" else "chirp_3"),
             recognizer_location=self.location_var.get().strip() or "us",
+            openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         )
 
         self._session = StreamingDictationSession(
@@ -175,7 +201,9 @@ class DictationApp(tk.Tk):
                 self.status_var.set(payload)
                 if payload in {"Stopped.", "Recognition stream ended."} or payload.startswith(
                     "Error:"
-                ) or payload.startswith("Google Cloud error:"):
+                ) or payload.startswith("Google Cloud error:") or payload.startswith(
+                    "Speech provider error:"
+                ) or payload.startswith("Typing failed:"):
                     self.start_button.configure(state="normal")
                     self.stop_button.configure(state="disabled")
                     self._session = None
