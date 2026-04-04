@@ -32,7 +32,7 @@ class DictationApp(tk.Tk):
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._session: ManualDictationSession | None = None
         self._hotkey_listener: HotkeyListener | None = None
-        self._recording_meter = RecordingMeter(self) if sys.platform == "win32" else None
+        self._recording_meter: RecordingMeter | None = None
 
         self._build_widgets()
         self._start_hotkey_listener()
@@ -109,10 +109,14 @@ class DictationApp(tk.Tk):
             row=0, column=2
         )
 
+        if sys.platform == "win32":
+            self._recording_meter = RecordingMeter(button_row)
+            self._recording_meter.grid(row=0, column=3, padx=(12, 0), sticky="w")
+
         content = ttk.Frame(self, padding=(16, 0, 16, 16))
         content.grid(row=1, column=0, sticky="nsew")
         content.columnconfigure(0, weight=1)
-        content.rowconfigure(4, weight=1)
+        content.rowconfigure(3, weight=1)
 
         ttk.Label(
             content,
@@ -131,11 +135,8 @@ class DictationApp(tk.Tk):
             row=2, column=0, sticky="w", pady=(0, 12)
         )
 
-        if self._recording_meter is not None:
-            self._recording_meter.grid(row=3, column=0, sticky="ew", pady=(0, 12))
-
         transcript_frame = ttk.LabelFrame(content, text="Captured Transcript")
-        transcript_frame.grid(row=4, column=0, sticky="nsew")
+        transcript_frame.grid(row=3, column=0, sticky="nsew")
         transcript_frame.columnconfigure(0, weight=1)
         transcript_frame.rowconfigure(0, weight=1)
 
