@@ -1,5 +1,4 @@
 .venv/
-.venv-linux/
 .tmp/
 .pip-cache/
 .virtualenv-appdata/
