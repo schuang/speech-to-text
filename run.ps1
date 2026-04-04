@@ -1,5 +1,5 @@
 param(
-    [string]$Provider = "gcp",
+    [string]$Provider = "",
     [string]$ProjectId = "",
     [string]$Location = "us",
     [switch]$SmokeTest
@@ -16,6 +16,14 @@ if (-not (Test-Path -LiteralPath $activateScript)) {
 }
 
 . $activateScript
+
+if (-not $Provider) {
+    $Provider = $env:SPEECH_PROVIDER
+}
+
+if (-not $Provider) {
+    $Provider = "gcp"
+}
 
 $env:SPEECH_PROVIDER = $Provider
 
