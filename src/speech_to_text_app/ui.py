@@ -35,6 +35,7 @@ class DictationApp(tk.Tk):
         self._recording_meter = RecordingMeterPopup(self) if sys.platform == "win32" else None
 
         self._build_widgets()
+        self.bind("<Configure>", self._on_window_configure)
         self._start_hotkey_listener()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(100, self._pump_events)
@@ -283,6 +284,11 @@ class DictationApp(tk.Tk):
         if self._recording_meter is None:
             return
         self._recording_meter.update_level(level)
+
+    def _on_window_configure(self, _event: tk.Event) -> None:
+        if self._recording_meter is None:
+            return
+        self._recording_meter.reposition()
 
     def _on_close(self) -> None:
         if self._hotkey_listener is not None:

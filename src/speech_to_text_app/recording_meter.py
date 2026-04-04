@@ -9,6 +9,8 @@ class RecordingMeterPopup:
         self._window: tk.Toplevel | None = None
         self._canvas: tk.Canvas | None = None
         self._levels = [0.0] * 14
+        self._width = 240
+        self._height = 64
 
     def show(self) -> None:
         if self._window is None or not self._window.winfo_exists():
@@ -20,8 +22,8 @@ class RecordingMeterPopup:
 
             self._canvas = tk.Canvas(
                 self._window,
-                width=240,
-                height=64,
+                width=self._width,
+                height=self._height,
                 highlightthickness=0,
                 bg="#111111",
             )
@@ -50,18 +52,26 @@ class RecordingMeterPopup:
         self._levels = self._levels[1:] + [clamped]
         self._draw()
 
+    def reposition(self) -> None:
+        if self._window is None or not self._window.winfo_exists():
+            return
+        self._position_window()
+
     def _position_window(self) -> None:
         if self._window is None:
             return
 
         self._master.update_idletasks()
-        screen_width = self._window.winfo_screenwidth()
-        screen_height = self._window.winfo_screenheight()
-        width = 240
-        height = 64
-        x = screen_width - width - 28
-        y = screen_height - height - 96
-        self._window.geometry(f"{width}x{height}+{x}+{y}")
+        x = self._master.winfo_x() + self._master.winfo_width() - self._width - 16
+        y = self._master.winfo_y() - self._height - 10
+
+        if y < 16:
+            y = self._master.winfo_y() + 42
+
+        if x < 16:
+            x = 16
+
+        self._window.geometry(f"{self._width}x{self._height}+{x}+{y}")
 
     def _draw(self) -> None:
         if self._canvas is None:
@@ -97,4 +107,3 @@ class RecordingMeterPopup:
             bottom = midline + amplitude
             color = "#3bd16f" if level > 0.12 else "#4d5963"
             canvas.create_rectangle(left, top, right, bottom, fill=color, outline=color)
-
