@@ -163,29 +163,6 @@ class WindowsTextInjector:
         )
         self._send_inputs([key_down, key_up])
 
-    def _press_vk(self, virtual_key: int) -> None:
-        key_down = INPUT(
-            type=INPUT_KEYBOARD,
-            ki=KEYBDINPUT(
-                wVk=virtual_key,
-                wScan=0,
-                dwFlags=0,
-                time=0,
-                dwExtraInfo=0,
-            ),
-        )
-        key_up = INPUT(
-            type=INPUT_KEYBOARD,
-            ki=KEYBDINPUT(
-                wVk=virtual_key,
-                wScan=0,
-                dwFlags=KEYEVENTF_KEYUP,
-                time=0,
-                dwExtraInfo=0,
-            ),
-        )
-        self._send_inputs([key_down, key_up])
-
     def _paste_text(self, text: str) -> None:
         self._set_clipboard_text(text)
 

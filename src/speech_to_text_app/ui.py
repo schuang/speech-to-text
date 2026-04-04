@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .config import AppConfig
-from .injector import WindowsTextInjector
+from .injectors import WindowsTextInjector
 from .recognizer import StreamingDictationSession
 
 

@@ -8,7 +8,7 @@ from google.api_core import exceptions as google_exceptions
 
 from .audio import MicrophoneStream
 from .config import AppConfig
-from .injector import WindowsTextInjector
+from .injectors import TextInjector, WindowsTextInjector
 from .providers import GcpSpeechProvider, SpeechProvider, TranscriptEvent
 
 
@@ -23,7 +23,7 @@ class StreamingDictationSession:
     def __init__(
         self,
         config: AppConfig,
-        injector: WindowsTextInjector,
+        injector: TextInjector,
         provider: SpeechProvider | None = None,
         on_status: StatusCallback | None = None,
         on_interim: TextCallback | None = None,
