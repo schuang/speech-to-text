@@ -17,6 +17,7 @@ LOGGER = logging.getLogger(__name__)
 
 StatusCallback = Callable[[str], None]
 TextCallback = Callable[[str], None]
+LevelCallback = Callable[[float], None]
 
 
 class ManualDictationSession:
@@ -27,12 +28,14 @@ class ManualDictationSession:
         provider: SpeechProvider | None = None,
         on_status: StatusCallback | None = None,
         on_final: TextCallback | None = None,
+        on_level: LevelCallback | None = None,
     ) -> None:
         self.config = config
         self.injector = injector
         self.provider = provider or build_speech_provider(config)
         self.on_status = on_status or (lambda _message: None)
         self.on_final = on_final or (lambda _text: None)
+        self.on_level = on_level or (lambda _level: None)
 
         self._recorder: ManualAudioRecorder | None = None
         self._transcription_thread: threading.Thread | None = None
@@ -52,6 +55,7 @@ class ManualDictationSession:
         self._recorder = ManualAudioRecorder(
             sample_rate_hz=self.config.sample_rate_hz,
             chunk_ms=self.config.chunk_ms,
+            on_level=self.on_level,
         )
         try:
             self._recorder.start()
@@ -59,6 +63,7 @@ class ManualDictationSession:
             self._recorder = None
             self.on_status(f"Error: {error}")
             return
+        self.on_level(0.0)
         self.on_status("Recording. Press Stop when your utterance is complete.")
 
     def stop_recording(self) -> None:
@@ -72,6 +77,7 @@ class ManualDictationSession:
             self.on_status(f"Error: {error}")
             return
         self._recorder = None
+        self.on_level(0.0)
 
         if not audio_bytes:
             self.on_status("No audio captured.")

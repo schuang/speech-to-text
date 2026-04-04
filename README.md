@@ -7,6 +7,7 @@ This project is a small desktop app written in Python. It records your speech be
 - Uses your local microphone as the audio source.
 - Uses explicit manual start/stop recording instead of silence-based auto-stop.
 - Supports a Windows global hotkey toggle for start/stop recording.
+- Shows a small Windows recording meter while audio is being captured.
 - Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
 - Shows finalized transcripts in a local control window.
 - Types final transcript text into the active application, such as a terminal, VS Code, LibreOffice, Word, or a browser text field.
@@ -205,6 +206,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
 - The default GCP location is `us`.
 - Windows text injection uses Unicode keyboard events.
+- Windows shows a small live recording meter while audio is being captured.
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.
 - macOS text injection uses `pbcopy` and `osascript`, and requires Accessibility permission.
 - macOS global hotkeys use `pynput` and also require Accessibility permission.
