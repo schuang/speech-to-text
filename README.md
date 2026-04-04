@@ -22,6 +22,7 @@ This project is a small desktop app written in Python. It records your speech be
   - `wtype` on Wayland
 - For Linux audio capture with `sounddevice`: PortAudio must be installed at the system level
 - For macOS text injection: grant Accessibility access to your terminal app or Python app
+- For macOS global hotkeys: Accessibility access is also required
 
 ## Setup
 
@@ -96,7 +97,7 @@ This project is a small desktop app written in Python. It records your speech be
    $env:GOOGLE_CLOUD_LOCATION="us"
    ```
 
-   Optional: set the global hotkey. Default is `ctrl+alt+space`. Global hotkeys are currently supported on Windows only.
+   Optional: set the global hotkey. Default is `ctrl+alt+space`. Global hotkeys are currently supported on Windows and macOS.
 
    ```powershell
    $env:DICTATION_HOTKEY="ctrl+alt+space"
@@ -206,7 +207,8 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - Windows text injection uses Unicode keyboard events.
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.
 - macOS text injection uses `pbcopy` and `osascript`, and requires Accessibility permission.
-- Global hotkeys are currently supported on Windows only. Linux and macOS can still use the UI buttons for manual start/stop.
+- macOS global hotkeys use `pynput` and also require Accessibility permission.
+- Global hotkeys are currently supported on Windows and macOS. Linux can still use the UI buttons for manual start/stop.
 - The GCP backend transcribes one recorded utterance at a time.
 - The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
 
