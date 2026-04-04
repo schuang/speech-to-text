@@ -6,6 +6,9 @@ import tkinter as tk
 class RecordingMeter:
     def __init__(self, parent: tk.Widget) -> None:
         self._level = 0.0
+        self._gain = 3.8
+        self._attack = 0.7
+        self._release = 0.25
         self._frame = tk.Frame(
             parent,
             bg="#111111",
@@ -46,7 +49,10 @@ class RecordingMeter:
         if not self._visible:
             return
 
-        self._level = max(0.0, min(1.0, level))
+        boosted = min(1.0, max(0.0, level) * self._gain)
+        target = boosted**0.6
+        blend = self._attack if target >= self._level else self._release
+        self._level = self._level + (target - self._level) * blend
         self._draw()
 
     def _draw(self) -> None:
