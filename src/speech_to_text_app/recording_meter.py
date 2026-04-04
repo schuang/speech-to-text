@@ -5,7 +5,7 @@ import tkinter as tk
 
 class RecordingMeter:
     def __init__(self, parent: tk.Widget) -> None:
-        self._levels = [0.0] * 14
+        self._level = 0.0
         self._frame = tk.Frame(
             parent,
             bg="#111111",
@@ -30,7 +30,7 @@ class RecordingMeter:
         self._frame.grid_remove()
 
     def show(self) -> None:
-        self._levels = [0.0] * len(self._levels)
+        self._level = 0.0
         self._draw()
         self._frame.grid()
         self._visible = True
@@ -46,8 +46,7 @@ class RecordingMeter:
         if not self._visible:
             return
 
-        clamped = max(0.0, min(1.0, level))
-        self._levels = self._levels[1:] + [clamped]
+        self._level = max(0.0, min(1.0, level))
         self._draw()
 
     def _draw(self) -> None:
@@ -66,19 +65,36 @@ class RecordingMeter:
             anchor="w",
             font=("Segoe UI", 9, "bold"),
         )
-        canvas.create_line(38, midline, width - 8, midline, fill="#2a2a2a", width=2)
+        bar_left = 42
+        bar_right = width - 8
+        bar_top = 8
+        bar_bottom = height - 8
+        bar_width = max(12, bar_right - bar_left)
+        fill_right = bar_left + int(bar_width * self._level)
 
-        usable_width = max(100, width - 52)
-        gap = 3
-        bar_width = max(5, int((usable_width - gap * (len(self._levels) - 1)) / len(self._levels)))
-        max_height = 9
-        bar_start_x = 44
+        canvas.create_rectangle(
+            bar_left,
+            bar_top,
+            bar_right,
+            bar_bottom,
+            fill="#1f2428",
+            outline="#2f353a",
+            width=1,
+        )
 
-        for index, level in enumerate(self._levels):
-            amplitude = max(1, int(level * max_height))
-            left = bar_start_x + index * (bar_width + gap)
-            right = left + bar_width
-            top = midline - amplitude
-            bottom = midline + amplitude
-            color = "#3bd16f" if level > 0.12 else "#4d5963"
-            canvas.create_rectangle(left, top, right, bottom, fill=color, outline=color)
+        if self._level > 0:
+            if self._level > 0.7:
+                color = "#f7b731"
+            elif self._level > 0.12:
+                color = "#3bd16f"
+            else:
+                color = "#4d5963"
+            canvas.create_rectangle(
+                bar_left,
+                bar_top,
+                max(bar_left + 2, fill_right),
+                bar_bottom,
+                fill=color,
+                outline=color,
+                width=0,
+            )
