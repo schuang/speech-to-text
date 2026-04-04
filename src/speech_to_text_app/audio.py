@@ -8,6 +8,10 @@ import sounddevice as sd
 LOGGER = logging.getLogger(__name__)
 
 
+class AudioRecorderError(RuntimeError):
+    """Raised when the microphone recorder cannot start or stop cleanly."""
+
+
 class ManualAudioRecorder:
     def __init__(self, sample_rate_hz: int, chunk_ms: int) -> None:
         self.sample_rate_hz = sample_rate_hz
@@ -27,21 +31,30 @@ class ManualAudioRecorder:
 
         self._buffer = bytearray()
         self._closed = False
-        self._stream = sd.RawInputStream(
-            samplerate=self.sample_rate_hz,
-            blocksize=self.frames_per_buffer,
-            channels=1,
-            dtype="int16",
-            callback=self._audio_callback,
-        )
-        self._stream.start()
+        try:
+            self._stream = sd.RawInputStream(
+                samplerate=self.sample_rate_hz,
+                blocksize=self.frames_per_buffer,
+                channels=1,
+                dtype="int16",
+                callback=self._audio_callback,
+            )
+            self._stream.start()
+        except sd.PortAudioError as error:
+            self._closed = True
+            self._stream = None
+            raise AudioRecorderError(self._format_portaudio_error(error)) from error
 
     def stop(self) -> bytes:
         self._closed = True
 
         if self._stream is not None:
-            self._stream.stop()
-            self._stream.close()
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except sd.PortAudioError as error:
+                self._stream = None
+                raise AudioRecorderError(self._format_portaudio_error(error)) from error
             self._stream = None
 
         return bytes(self._buffer)
@@ -65,3 +78,14 @@ class ManualAudioRecorder:
             return
 
         self._buffer.extend(indata)
+
+    def _format_portaudio_error(self, error: sd.PortAudioError) -> str:
+        message = str(error)
+        lowered = message.lower()
+        if "error querying device -1" in lowered or "device unavailable" in lowered:
+            return (
+                "No default microphone input device is available. "
+                "On WSL this usually means microphone passthrough is not configured; "
+                "test on a native Linux desktop or configure audio input for WSL."
+            )
+        return f"Microphone error: {message}"
