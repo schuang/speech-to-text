@@ -13,7 +13,7 @@ This project is a small desktop app written in Python. It records your speech be
 
 ## Requirements
 
-- Windows or Linux
+- Windows, Linux, or macOS
 - Python 3.11+ installed and available on `PATH`
 - For GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
 - For OpenAI mode: an `OPENAI_API_KEY`
@@ -21,6 +21,7 @@ This project is a small desktop app written in Python. It records your speech be
   - `xdotool` on X11, or
   - `wtype` on Wayland
 - For Linux audio capture with `sounddevice`: PortAudio must be installed at the system level
+- For macOS text injection: grant Accessibility access to your terminal app or Python app
 
 ## Setup
 
@@ -45,6 +46,12 @@ This project is a small desktop app written in Python. It records your speech be
    source .venv/bin/activate
    ```
 
+   On macOS:
+
+   ```bash
+   source .venv/bin/activate
+   ```
+
 4. Install dependencies from the activated virtual environment:
 
    ```powershell
@@ -57,6 +64,8 @@ This project is a small desktop app written in Python. It records your speech be
    sudo apt update
    sudo apt install -y libportaudio2 python3-tk xdotool wtype
    ```
+
+   On macOS, install Tkinter and audio dependencies through your Python distribution as needed, then grant Accessibility access before testing text injection.
 
 5. Choose a provider.
 
@@ -120,6 +129,14 @@ export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 ./run.sh
 ```
 
+macOS:
+
+```bash
+export SPEECH_PROVIDER="gcp"
+export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+./run.sh
+```
+
 You can also set the location if you want to override the default `us` region:
 
 ```powershell
@@ -142,6 +159,14 @@ $env:OPENAI_API_KEY="your-openai-api-key"
 ```
 
 Linux OpenAI example:
+
+```bash
+export SPEECH_PROVIDER="openai"
+export OPENAI_API_KEY="your-openai-api-key"
+./run.sh
+```
+
+macOS OpenAI example:
 
 ```bash
 export SPEECH_PROVIDER="openai"
@@ -180,7 +205,8 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The default GCP location is `us`.
 - Windows text injection uses Unicode keyboard events.
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.
-- Global hotkeys are currently supported on Windows only. Linux can still use the UI buttons for manual start/stop.
+- macOS text injection uses `pbcopy` and `osascript`, and requires Accessibility permission.
+- Global hotkeys are currently supported on Windows only. Linux and macOS can still use the UI buttons for manual start/stop.
 - The GCP backend transcribes one recorded utterance at a time.
 - The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
 
