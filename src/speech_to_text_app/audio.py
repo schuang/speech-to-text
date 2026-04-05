@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import sounddevice as sd
 
@@ -12,10 +13,19 @@ class AudioRecorderError(RuntimeError):
     """Raised when the microphone recorder cannot start or stop cleanly."""
 
 
+LevelCallback = Callable[[float], None]
+
+
 class ManualAudioRecorder:
-    def __init__(self, sample_rate_hz: int, chunk_ms: int) -> None:
+    def __init__(
+        self,
+        sample_rate_hz: int,
+        chunk_ms: int,
+        on_level: LevelCallback | None = None,
+    ) -> None:
         self.sample_rate_hz = sample_rate_hz
         self.chunk_ms = chunk_ms
+        self.on_level = on_level or (lambda _level: None)
         self.frames_per_buffer = max(1, int(sample_rate_hz * (chunk_ms / 1000.0)))
         self._stream: sd.RawInputStream | None = None
         self._closed = True
@@ -78,6 +88,15 @@ class ManualAudioRecorder:
             return
 
         self._buffer.extend(indata)
+        self.on_level(self._compute_level(indata))
+
+    def _compute_level(self, indata: bytes) -> float:
+        samples = memoryview(indata).cast("h")
+        if not samples:
+            return 0.0
+
+        peak = max(abs(sample) for sample in samples)
+        return min(1.0, peak / 32768.0)
 
     def _format_portaudio_error(self, error: sd.PortAudioError) -> str:
         message = str(error)

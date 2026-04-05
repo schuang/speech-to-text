@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import queue
+import sys
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -9,6 +10,7 @@ from .config import AppConfig
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
 from .recognizer import ManualDictationSession
+from .recording_meter import RecordingMeter
 
 
 class DictationApp(tk.Tk):
@@ -27,9 +29,10 @@ class DictationApp(tk.Tk):
         self.location_var = tk.StringVar(value=default_config.recognizer_location)
         self.status_var = tk.StringVar(value="Idle")
 
-        self._events: queue.Queue[tuple[str, str]] = queue.Queue()
+        self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._session: ManualDictationSession | None = None
         self._hotkey_listener: HotkeyListener | None = None
+        self._recording_meter: RecordingMeter | None = None
 
         self._build_widgets()
         self._start_hotkey_listener()
@@ -105,6 +108,10 @@ class DictationApp(tk.Tk):
         ttk.Button(button_row, text="Hide Window", command=self.iconify).grid(
             row=0, column=2
         )
+
+        if sys.platform == "win32":
+            self._recording_meter = RecordingMeter(button_row)
+            self._recording_meter.grid(row=0, column=3, padx=(12, 0), sticky="w")
 
         content = ttk.Frame(self, padding=(16, 0, 16, 16))
         content.grid(row=1, column=0, sticky="nsew")
@@ -188,8 +195,12 @@ class DictationApp(tk.Tk):
             injector=injector,
             on_status=lambda message: self._events.put(("status", message)),
             on_final=lambda text: self._events.put(("final", text)),
+            on_level=lambda level: self._events.put(("level", level)),
         )
         self._session.start_recording()
+
+        if self._session.recording:
+            self._show_recording_meter()
 
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
@@ -199,6 +210,7 @@ class DictationApp(tk.Tk):
         if self._session is not None:
             self._session.stop_recording()
 
+        self._hide_recording_meter()
         self.stop_button.configure(state="disabled")
         self.status_var.set("Stopping recording...")
 
@@ -218,6 +230,7 @@ class DictationApp(tk.Tk):
                 } or payload.startswith("Error:") or payload.startswith(
                     "Speech provider error:"
                 ) or payload.startswith("Typing failed:"):
+                    self._hide_recording_meter()
                     self.start_button.configure(state="normal")
                     self.stop_button.configure(state="disabled")
                     if self._session is not None and not self._session.recording:
@@ -226,6 +239,8 @@ class DictationApp(tk.Tk):
                 self._toggle_recording()
             elif event_type == "final":
                 self._append_final_text(payload)
+            elif event_type == "level":
+                self._update_recording_meter(float(payload))
 
         self.after(100, self._pump_events)
 
@@ -258,6 +273,21 @@ class DictationApp(tk.Tk):
             self._hotkey_listener = None
             self.status_var.set(f"Hotkey unavailable: {error}")
 
+    def _show_recording_meter(self) -> None:
+        if self._recording_meter is None:
+            return
+        self._recording_meter.show()
+
+    def _hide_recording_meter(self) -> None:
+        if self._recording_meter is None:
+            return
+        self._recording_meter.hide()
+
+    def _update_recording_meter(self, level: float) -> None:
+        if self._recording_meter is None:
+            return
+        self._recording_meter.update_level(level)
+
     def _on_close(self) -> None:
         if self._hotkey_listener is not None:
             self._hotkey_listener.stop()
@@ -265,6 +295,9 @@ class DictationApp(tk.Tk):
         if self._session is not None:
             self._session.close()
             self._session = None
+        if self._recording_meter is not None:
+            self._recording_meter.close()
+            self._recording_meter = None
         self.destroy()
 
 
