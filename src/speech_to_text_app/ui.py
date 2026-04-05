@@ -4,6 +4,7 @@ import os
 import queue
 import sys
 import tkinter as tk
+from pathlib import Path
 from tkinter import messagebox, ttk
 
 from .config import AppConfig
@@ -19,6 +20,8 @@ class DictationApp(tk.Tk):
         self.title("Speech To Text Dictation")
         self.geometry("760x520")
         self.minsize(680, 460)
+        self._icon_image: tk.PhotoImage | None = None
+        self._set_window_icon()
 
         default_config = AppConfig.from_env()
         self.provider_var = tk.StringVar(value=default_config.provider)
@@ -38,6 +41,17 @@ class DictationApp(tk.Tk):
         self._start_hotkey_listener()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(100, self._pump_events)
+
+    def _set_window_icon(self) -> None:
+        icon_path = Path(__file__).with_name("assets") / "microphone.png"
+        if not icon_path.exists():
+            return
+
+        try:
+            self._icon_image = tk.PhotoImage(file=str(icon_path))
+            self.iconphoto(True, self._icon_image)
+        except tk.TclError:
+            self._icon_image = None
 
     def _build_widgets(self) -> None:
         self.columnconfigure(0, weight=1)
