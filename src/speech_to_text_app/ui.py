@@ -18,8 +18,8 @@ class DictationApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Speech To Text Dictation")
-        self.geometry("760x520")
-        self.minsize(680, 460)
+        self.geometry("420x520")
+        self.minsize(400, 460)
         self._icon_image: tk.PhotoImage | None = None
         self._set_window_icon()
 
@@ -140,7 +140,7 @@ class DictationApp(tk.Tk):
                 "and stop where supported. Final transcript text is typed into the "
                 "active window."
             ),
-            wraplength=700,
+            wraplength=360,
             justify="left",
         ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
