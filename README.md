@@ -31,7 +31,7 @@ This project is a small desktop app written in Python. It records your speech be
 2. Create the project virtual environment:
 
    ```powershell
-   python -m virtualenv .venv
+   python -m venv .venv
    ```
 
 3. Activate the virtual environment before installing or running anything in this project.
