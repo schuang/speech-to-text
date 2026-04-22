@@ -11,11 +11,12 @@ from .config import AppConfig
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
 from .recognizer import ManualDictationSession
+from .recording_indicator import FloatingRecordingIndicator
 from .recording_meter import RecordingMeter
 
 
 class DictationApp(tk.Tk):
-    _DEFAULT_HOTKEY = "f6" if sys.platform == "darwin" else "ctrl+alt+space"
+    _DEFAULT_HOTKEY = "ctrl+shift+space" if sys.platform == "darwin" else "ctrl+alt+space"
 
     def __init__(self) -> None:
         super().__init__()
@@ -32,11 +33,13 @@ class DictationApp(tk.Tk):
         self.model_var = tk.StringVar(value=default_config.resolved_model)
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
         self.location_var = tk.StringVar(value=default_config.recognizer_location)
+        self.ollama_base_url_var = tk.StringVar(value=default_config.ollama_base_url)
         self.status_var = tk.StringVar(value="Idle")
 
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._session: ManualDictationSession | None = None
         self._hotkey_listener: HotkeyListener | None = None
+        self._recording_indicator = FloatingRecordingIndicator(self)
         self._recording_meter: RecordingMeter | None = None
 
         self._build_widgets()
@@ -64,7 +67,10 @@ class DictationApp(tk.Tk):
         config_frame.columnconfigure(1, weight=1)
         row = 0
 
-        provider_name = "OpenAI" if self._provider == "openai" else "Google Cloud"
+        provider_name = {
+            "openai": "OpenAI",
+            "ollama": "Ollama",
+        }.get(self._provider, "Google Cloud")
         ttk.Label(config_frame, text="Provider").grid(
             row=row, column=0, sticky="w", pady=(0, 8)
         )
@@ -78,6 +84,14 @@ class DictationApp(tk.Tk):
                 row=row, column=0, sticky="w", pady=(0, 8)
             )
             ttk.Label(config_frame, text="Loaded from OPENAI_API_KEY").grid(
+                row=row, column=1, sticky="w", pady=(0, 8)
+            )
+            row += 1
+        elif self._provider == "ollama":
+            ttk.Label(config_frame, text="Base URL").grid(
+                row=row, column=0, sticky="w", pady=(0, 8)
+            )
+            ttk.Label(config_frame, text="Loaded from OLLAMA_BASE_URL").grid(
                 row=row, column=1, sticky="w", pady=(0, 8)
             )
             row += 1
@@ -160,11 +174,11 @@ class DictationApp(tk.Tk):
             content,
             text=(
                 "Usage: click Start Recording, speak your full prompt or paragraph, "
-                "then click Stop And Transcribe. On macOS, the default hotkey is F6: "
-                "press and hold F6 to record, then release to transcribe, paste into "
-                "the focused app, and "
-                "copy the transcript to the clipboard. The manual buttons remain as a "
-                "fallback."
+                "then click Stop And Transcribe. The default hotkey is "
+                "ctrl+shift+space on macOS and ctrl+alt+space on Windows. Press the hotkey once to start "
+                "recording and press it again to stop, transcribe, paste into the "
+                "focused app, and copy the transcript to the clipboard. The manual "
+                "buttons remain as a fallback."
             ),
             wraplength=400,
             justify="left",
@@ -205,16 +219,23 @@ class DictationApp(tk.Tk):
                 "Set OPENAI_API_KEY before starting OpenAI mode.",
             )
             return
+        ollama_base_url = self.ollama_base_url_var.get().strip()
+        if provider == "ollama" and not ollama_base_url:
+            messagebox.showerror(
+                "Missing Ollama URL",
+                "Set OLLAMA_BASE_URL before starting Ollama mode.",
+            )
+            return
 
         config = AppConfig(
             provider=provider,
             project_id=project_id,
             language_code=self.language_var.get().strip() or "en-US",
-            model=self.model_var.get().strip()
-            or ("gpt-4o-mini-transcribe" if provider == "openai" else "chirp_3"),
+            model=self.model_var.get().strip() or self._default_model_for_provider(provider),
             hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
             recognizer_location=self.location_var.get().strip() or "us",
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+            ollama_base_url=ollama_base_url,
         )
 
         try:
@@ -234,6 +255,7 @@ class DictationApp(tk.Tk):
 
         if self._session.recording:
             self._show_recording_meter()
+            self.after(75, self._restore_recording_target)
 
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
@@ -243,7 +265,10 @@ class DictationApp(tk.Tk):
         if self._session is not None:
             self._session.stop_recording()
 
-        self._hide_recording_meter()
+        if self._recording_indicator is not None:
+            self._recording_indicator.show_transcribing()
+        if self._recording_meter is not None:
+            self._recording_meter.hide()
         self.stop_button.configure(state="disabled")
         self.status_var.set("Stopping recording...")
 
@@ -268,10 +293,6 @@ class DictationApp(tk.Tk):
                     self.stop_button.configure(state="disabled")
                     if self._session is not None and not self._session.recording:
                         self._session = None
-            elif event_type == "hotkey_press":
-                self._handle_hotkey_press()
-            elif event_type == "hotkey_release":
-                self._handle_hotkey_release()
             elif event_type == "toggle":
                 self._toggle_recording()
             elif event_type == "final":
@@ -287,17 +308,6 @@ class DictationApp(tk.Tk):
         self.final_text.see("end")
         self.final_text.configure(state="disabled")
 
-    def _handle_hotkey_press(self) -> None:
-        if self._session is not None and self._session.transcribing:
-            self.status_var.set("Transcription still in progress.")
-            return
-
-        self._start_session()
-
-    def _handle_hotkey_release(self) -> None:
-        if self._session is not None and self._session.recording:
-            self._stop_session()
-
     def _toggle_recording(self) -> None:
         if self._session is not None and self._session.recording:
             self._stop_session()
@@ -312,6 +322,17 @@ class DictationApp(tk.Tk):
     def _restart_hotkey_listener(self) -> None:
         self._start_hotkey_listener()
 
+    def _restore_recording_target(self) -> None:
+        if self._session is None or not self._session.recording:
+            return
+        self._session.restore_target_focus()
+
+    def _default_model_for_provider(self, provider: str) -> str:
+        return {
+            "openai": "gpt-4o-mini-transcribe",
+            "ollama": "gemma4:default",
+        }.get(provider, "chirp_3")
+
     def _start_hotkey_listener(self) -> None:
         hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY
 
@@ -320,41 +341,33 @@ class DictationApp(tk.Tk):
             self._hotkey_listener = None
 
         try:
-            if sys.platform == "darwin":
-                callback = lambda: self._events.put(("hotkey_press", ""))
-                release_callback = lambda: self._events.put(("hotkey_release", ""))
-            else:
-                callback = lambda: self._events.put(("toggle", ""))
-                release_callback = None
-
             self._hotkey_listener = build_hotkey_listener(
                 hotkey=hotkey,
-                callback=callback,
-                release_callback=release_callback,
+                callback=lambda: self._events.put(("toggle", "")),
+                release_callback=None,
             )
             self._hotkey_listener.start()
-            if sys.platform == "darwin":
-                self.status_var.set(f"Idle. Hold hotkey to talk: {hotkey}")
-            else:
-                self.status_var.set(f"Idle. Toggle hotkey ready: {hotkey}")
+            self.status_var.set(f"Idle. Press {hotkey} to start or stop recording.")
         except HotkeyError as error:
             self._hotkey_listener = None
             self.status_var.set(f"Hotkey unavailable: {error}")
 
     def _show_recording_meter(self) -> None:
-        if self._recording_meter is None:
-            return
-        self._recording_meter.show()
+        if self._recording_meter is not None:
+            self._recording_meter.show()
+        self._recording_indicator.show_recording(
+            self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY
+        )
 
     def _hide_recording_meter(self) -> None:
-        if self._recording_meter is None:
-            return
-        self._recording_meter.hide()
+        if self._recording_meter is not None:
+            self._recording_meter.hide()
+        self._recording_indicator.hide()
 
     def _update_recording_meter(self, level: float) -> None:
-        if self._recording_meter is None:
-            return
-        self._recording_meter.update_level(level)
+        if self._recording_meter is not None:
+            self._recording_meter.update_level(level)
+        self._recording_indicator.update_level(level)
 
     def _on_close(self) -> None:
         if self._hotkey_listener is not None:
@@ -363,6 +376,7 @@ class DictationApp(tk.Tk):
         if self._session is not None:
             self._session.close()
             self._session = None
+        self._recording_indicator.close()
         if self._recording_meter is not None:
             self._recording_meter.close()
             self._recording_meter = None

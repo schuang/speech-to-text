@@ -34,6 +34,23 @@ class AppConfigTests(unittest.TestCase):
 
         self.assertEqual(config.normalized_provider, "openai")
 
+    def test_from_env_uses_ollama_when_ollama_env_is_present(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SPEECH_PROVIDER": "",
+                "OPENAI_API_KEY": "",
+                "OLLAMA_BASE_URL": "http://ollama.example:11434",
+                "OLLAMA_MODEL": "gemma4:custom",
+            },
+            clear=False,
+        ):
+            config = AppConfig.from_env()
+
+        self.assertEqual(config.normalized_provider, "ollama")
+        self.assertEqual(config.resolved_model, "gemma4:custom")
+        self.assertEqual(config.ollama_chat_url, "http://ollama.example:11434/api/chat")
+
 
 if __name__ == "__main__":
     unittest.main()

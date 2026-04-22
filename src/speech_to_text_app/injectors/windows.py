@@ -91,7 +91,14 @@ class WindowsTextInjector:
     def __init__(self, delay_seconds: float = 0.0) -> None:
         self.delay_seconds = delay_seconds
 
-    def type_text(self, text: str) -> None:
+    def capture_target(self) -> None:
+        return None
+
+    def restore_target(self, target: object | None) -> None:
+        del target
+
+    def type_text(self, text: str, target: object | None = None) -> None:
+        del target
         if not text:
             return
 

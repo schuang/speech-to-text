@@ -63,7 +63,7 @@ def _parse_hotkey(hotkey: str) -> tuple[frozenset[str], str]:
 
     if key_part is None:
         raise HotkeyError(
-            "Hotkey must include a key, for example f6 or ctrl+alt+space."
+            "Hotkey must include a key, for example f6 or ctrl+shift+space."
         )
     if not modifier_parts and not key_part.startswith("f"):
         raise HotkeyError(

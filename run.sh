@@ -25,4 +25,16 @@ EOF
   exit 1
 fi
 
+if [[ "$provider" == "ollama" && -z "${OLLAMA_BASE_URL:-}" ]]; then
+  cat >&2 <<'EOF'
+OLLAMA_BASE_URL is required for Ollama mode, for example:
+
+export SPEECH_PROVIDER="ollama"
+export OLLAMA_BASE_URL="http://your-ollama-host:11434"
+export OLLAMA_MODEL="gemma4:default"
+./run.sh
+EOF
+  exit 1
+fi
+
 python -m speech_to_text_app

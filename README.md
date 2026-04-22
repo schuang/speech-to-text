@@ -8,7 +8,7 @@ This project is a small desktop app written in Python. It records your speech be
 - Uses explicit manual start/stop recording instead of silence-based auto-stop.
 - Supports global hotkeys on macOS and Windows.
 - Shows a small Windows recording meter while audio is being captured.
-- Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
+- Supports Google Cloud Speech-to-Text V2, OpenAI transcription models, and Ollama-hosted Gemma 4 transcription.
 - Detects the active provider from your environment.
 - Shows finalized transcripts in a local control window.
 - Pastes final transcript text into the active application, such as a terminal, VS Code, LibreOffice, Word, or a browser text field.
@@ -20,6 +20,7 @@ This project is a small desktop app written in Python. It records your speech be
 - Python 3.11+ installed and available on `PATH`
 - For GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
 - For OpenAI mode: an `OPENAI_API_KEY`
+- For Ollama mode: an `OLLAMA_BASE_URL` that points to a reachable Ollama server
 - For Linux text injection:
   - `xdotool` on X11, or
   - `wtype` on Wayland
@@ -89,8 +90,9 @@ This project is a small desktop app written in Python. It records your speech be
 
    Provider detection works like this:
 
-   - If `SPEECH_PROVIDER` is set to `gcp` or `openai`, the app uses that value.
+   - If `SPEECH_PROVIDER` is set to `gcp`, `openai`, or `ollama`, the app uses that value.
    - Otherwise, if `OPENAI_API_KEY` is set, the app uses OpenAI.
+   - Otherwise, if `OLLAMA_BASE_URL` is set, the app uses Ollama.
    - Otherwise, the app defaults to Google Cloud.
 
    For Google Cloud:
@@ -106,10 +108,10 @@ This project is a small desktop app written in Python. It records your speech be
    $env:GOOGLE_CLOUD_LOCATION="us"
    ```
 
-   Optional: set the global hotkey. On macOS the default is `f6`. On Windows the default is `ctrl+alt+space`. Global hotkeys are currently supported on Windows and macOS.
+   Optional: set the global hotkey. On macOS the default is `ctrl+shift+space`. On Windows the default is `ctrl+alt+space`. Global hotkeys are currently supported on Windows and macOS.
 
    ```powershell
-   $env:DICTATION_HOTKEY="f6"
+   $env:DICTATION_HOTKEY="ctrl+shift+space"
    ```
 
    For OpenAI:
@@ -117,6 +119,14 @@ This project is a small desktop app written in Python. It records your speech be
    ```powershell
    $env:SPEECH_PROVIDER="openai"
    $env:OPENAI_API_KEY="your-openai-api-key"
+   ```
+
+   For Ollama:
+
+   ```powershell
+   $env:SPEECH_PROVIDER="ollama"
+   $env:OLLAMA_BASE_URL="http://your-ollama-host:11434"
+   $env:OLLAMA_MODEL="gemma4:default"
    ```
 
 ## Run
@@ -168,6 +178,15 @@ $env:OPENAI_API_KEY="your-openai-api-key"
 .\run.ps1
 ```
 
+Ollama example:
+
+```powershell
+$env:SPEECH_PROVIDER="ollama"
+$env:OLLAMA_BASE_URL="http://your-ollama-host:11434"
+$env:OLLAMA_MODEL="gemma4:default"
+.\run.ps1
+```
+
 Linux OpenAI example:
 
 ```bash
@@ -191,6 +210,15 @@ export OPENAI_API_KEY="your-openai-api-key"
 ./run.sh
 ```
 
+Linux Ollama example:
+
+```bash
+export SPEECH_PROVIDER="ollama"
+export OLLAMA_BASE_URL="http://your-ollama-host:11434"
+export OLLAMA_MODEL="gemma4:default"
+./run.sh
+```
+
 Optional location override:
 
 ```powershell
@@ -209,33 +237,38 @@ Windows smoke test without opening the UI:
 2. Confirm the detected provider, then review the fields shown for that provider.
 3. If the app is using Google Cloud, confirm the project ID and location.
 4. If the app is using OpenAI, confirm that `OPENAI_API_KEY` is set in your shell.
-5. Click into the target app where text should appear.
-6. Click `Start Recording` or use the global hotkey where supported.
-7. Speak your full prompt, including long pauses if needed.
-8. Click `Stop And Transcribe`, or on macOS release the held hotkey to transcribe and paste into the currently focused app.
+5. If the app is using Ollama, confirm that `OLLAMA_BASE_URL` is set in your shell and the model field matches the server model name.
+6. Click into the target app where text should appear.
+7. Click `Start Recording` or use the global hotkey where supported.
+8. Speak your full prompt, including long pauses if needed.
+9. Click `Stop And Transcribe`, or press the hotkey again to stop recording, transcribe, and paste into the currently focused app.
 
 The app only injects finalized transcription results. It does not auto-stop on silence. Finalized text is also copied to the clipboard.
 
 ## Notes
 
 - The default provider is `gcp`.
-- Provider selection comes from `SPEECH_PROVIDER` when set, otherwise the app infers OpenAI when `OPENAI_API_KEY` is present.
+- Provider selection comes from `SPEECH_PROVIDER` when set, otherwise the app infers OpenAI when `OPENAI_API_KEY` is present, then Ollama when `OLLAMA_BASE_URL` is present.
 - The UI no longer exposes provider editing. It shows only the fields relevant to the detected provider.
 - When OpenAI is active, the UI hides Google Cloud project and location fields.
+- When Ollama is active, the UI expects `OLLAMA_BASE_URL` from the environment and uses the model field for the Ollama model name.
 - When Google Cloud is active, the UI hides OpenAI-specific status rows.
 - The default GCP model is `chirp_3`.
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
+- The default Ollama model is `gemma4:default`, but `OLLAMA_MODEL` overrides it.
 - The default GCP location is `us`.
 - Windows text injection uses Unicode keyboard events.
 - Windows shows a small live recording meter while audio is being captured.
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.
 - macOS text injection uses `pbcopy` and `osascript`, and requires Accessibility permission.
 - macOS global hotkeys use `pynput`, work while another app has focus, and also require Accessibility permission.
-- On macOS the default flow is push-to-talk: hold `f6` to record, then release to transcribe, paste into the focused field, and leave the transcript on the clipboard.
-- Depending on your keyboard settings, you may need `Fn+F6` instead of plain `F6` to send a standard function-key press on macOS.
+- The default hotkey flow is toggle-to-record: press the hotkey once to start recording, then press it again to transcribe, paste into the focused field, and leave the transcript on the clipboard.
+- While recording or transcribing, the app shows a small floating status indicator so you can tell what state it is in even when the main window is hidden.
+- The macOS default uses modifiers specifically to avoid common browser `F6` focus shortcuts that jump to the address bar.
 - Global hotkeys are currently supported on Windows and macOS. Linux can still use the UI buttons for manual start/stop.
 - The GCP backend transcribes one recorded utterance at a time.
 - The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
+- The Ollama backend uploads one recorded WAV utterance to the configured `OLLAMA_BASE_URL` and emits finalized transcripts only.
 
 ## Project Layout
 

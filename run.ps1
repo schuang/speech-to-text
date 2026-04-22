@@ -41,6 +41,18 @@ if ($Provider -eq "gcp" -and -not $ProjectId) {
     )
 }
 
+if ($Provider -eq "ollama" -and -not $env:OLLAMA_BASE_URL) {
+    throw (
+        "OLLAMA_BASE_URL is required for Ollama mode. Set it first, for example:`n`n" +
+        '$env:SPEECH_PROVIDER="ollama"' +
+        "`n" +
+        '$env:OLLAMA_BASE_URL="http://your-ollama-host:11434"' +
+        "`n" +
+        '$env:OLLAMA_MODEL="gemma4:default"' +
+        "`n.\\run.ps1"
+    )
+}
+
 $env:GOOGLE_CLOUD_PROJECT = $ProjectId
 $env:GOOGLE_CLOUD_LOCATION = $Location
 
@@ -49,6 +61,8 @@ if ($SmokeTest) {
     Write-Output ("SPEECH_PROVIDER=" + $env:SPEECH_PROVIDER)
     Write-Output ("GOOGLE_CLOUD_PROJECT=" + $env:GOOGLE_CLOUD_PROJECT)
     Write-Output ("GOOGLE_CLOUD_LOCATION=" + $env:GOOGLE_CLOUD_LOCATION)
+    Write-Output ("OLLAMA_BASE_URL=" + $env:OLLAMA_BASE_URL)
+    Write-Output ("OLLAMA_MODEL=" + $env:OLLAMA_MODEL)
     python -c "import sys; import speech_to_text_app; print(sys.executable)"
     exit $LASTEXITCODE
 }

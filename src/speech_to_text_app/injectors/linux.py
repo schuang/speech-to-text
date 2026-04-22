@@ -12,7 +12,14 @@ class LinuxTextInjector:
         del delay_seconds
         self.backend = self._detect_backend()
 
-    def type_text(self, text: str) -> None:
+    def capture_target(self) -> None:
+        return None
+
+    def restore_target(self, target: object | None) -> None:
+        del target
+
+    def type_text(self, text: str, target: object | None = None) -> None:
+        del target
         if not text:
             return
 

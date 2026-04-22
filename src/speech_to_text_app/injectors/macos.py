@@ -2,8 +2,25 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from dataclasses import dataclass
+
+import ApplicationServices as AS
 
 from .base import TextInjectorError
+
+
+_TERMINAL_BUNDLE_IDS = {
+    "com.apple.Terminal",
+    "com.googlecode.iterm2",
+}
+
+
+@dataclass(frozen=True)
+class MacOSInjectionTarget:
+    app: object | None
+    window: object | None
+    element: object | None
+    bundle_id: str | None
 
 
 class MacOSTextInjector:
@@ -12,12 +29,54 @@ class MacOSTextInjector:
         self._require_tool("osascript")
         self._require_tool("pbcopy")
 
-    def type_text(self, text: str) -> None:
+    def capture_target(self) -> MacOSInjectionTarget | None:
+        system = AS.AXUIElementCreateSystemWide()
+        app = self._copy_ax_value(system, AS.kAXFocusedApplicationAttribute)
+        element = self._copy_ax_value(system, AS.kAXFocusedUIElementAttribute)
+        window = self._copy_ax_value(app, "AXFocusedWindow") if app is not None else None
+        bundle_id = self._frontmost_bundle_id()
+
+        if app is None and element is None and bundle_id is None:
+            return None
+
+        return MacOSInjectionTarget(
+            app=app,
+            window=window,
+            element=element,
+            bundle_id=bundle_id,
+        )
+
+    def restore_target(self, target: object | None) -> None:
+        if isinstance(target, MacOSInjectionTarget):
+            self._restore_focus_target(target)
+
+    def type_text(self, text: str, target: object | None = None) -> None:
         if not text:
             return
 
         self._copy_to_clipboard(text)
-        self._paste_clipboard()
+
+        macos_target = target if isinstance(target, MacOSInjectionTarget) else None
+        if macos_target is not None:
+            self._restore_focus_target(macos_target)
+            if self._should_use_ax_insertion(macos_target) and self._insert_text_into_target(
+                text,
+                macos_target,
+            ):
+                return
+
+        target_bundle_id = macos_target.bundle_id if macos_target is not None else None
+        current_bundle_id = self._frontmost_bundle_id()
+        should_activate_target = bool(
+            target_bundle_id and target_bundle_id != current_bundle_id
+        )
+        self._paste_clipboard(
+            target_bundle_id if should_activate_target else None
+        )
+
+    def _should_use_ax_insertion(self, target: MacOSInjectionTarget) -> bool:
+        bundle_id = (target.bundle_id or "").strip()
+        return bundle_id not in _TERMINAL_BUNDLE_IDS
 
     def _require_tool(self, tool_name: str) -> None:
         if shutil.which(tool_name):
@@ -40,12 +99,150 @@ class MacOSTextInjector:
             message = error.stderr.strip() or str(error)
             raise TextInjectorError(message) from error
 
-    def _paste_clipboard(self) -> None:
+    def _frontmost_bundle_id(self) -> str | None:
         script = (
             'tell application "System Events"\n'
-            '    keystroke "v" using command down\n'
+            '    try\n'
+            '        return bundle identifier of first application process whose frontmost is true\n'
+            '    on error\n'
+            '        return ""\n'
+            '    end try\n'
             "end tell"
         )
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            return None
+
+        target = result.stdout.strip()
+        return target or None
+
+    def _copy_ax_value(self, element: object | None, attribute: str) -> object | None:
+        if element is None:
+            return None
+
+        try:
+            error_code, value = AS.AXUIElementCopyAttributeValue(element, attribute, None)
+        except Exception:  # noqa: BLE001
+            return None
+
+        if error_code != AS.kAXErrorSuccess:
+            return None
+        return value
+
+    def _restore_focus_target(self, target: MacOSInjectionTarget) -> None:
+        if target.app is not None:
+            try:
+                AS.AXUIElementPerformAction(target.app, AS.kAXRaiseAction)
+            except Exception:  # noqa: BLE001
+                pass
+
+        if target.window is not None:
+            try:
+                AS.AXUIElementSetAttributeValue(target.window, "AXMain", True)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                AS.AXUIElementPerformAction(target.window, AS.kAXRaiseAction)
+            except Exception:  # noqa: BLE001
+                pass
+
+        if target.element is not None:
+            try:
+                AS.AXUIElementSetAttributeValue(
+                    target.element,
+                    AS.kAXFocusedAttribute,
+                    True,
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _insert_text_into_target(self, text: str, target: MacOSInjectionTarget) -> bool:
+        element = target.element
+        if element is None:
+            return False
+
+        selected_range = self._copy_ax_value(element, AS.kAXSelectedTextRangeAttribute)
+        current_value = self._copy_ax_value(element, AS.kAXValueAttribute)
+
+        if selected_range is not None and self._set_ax_value(
+            element,
+            AS.kAXSelectedTextAttribute,
+            text,
+        ):
+            return True
+
+        if isinstance(current_value, str) and selected_range is not None:
+            insertion = self._replace_selected_range(current_value, selected_range, text)
+            if insertion is not None:
+                return self._set_ax_value(element, AS.kAXValueAttribute, insertion)
+
+        if isinstance(current_value, str):
+            return self._set_ax_value(element, AS.kAXValueAttribute, current_value + text)
+
+        return False
+
+    def _replace_selected_range(
+        self,
+        current_value: str,
+        selected_range_value: object,
+        inserted_text: str,
+    ) -> str | None:
+        try:
+            success, selected_range = AS.AXValueGetValue(
+                selected_range_value,
+                AS.kAXValueCFRangeType,
+                None,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+
+        if not success:
+            return None
+
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            start, length = selected_range
+        elif isinstance(selected_range, AS.CFRange):
+            start = selected_range.location
+            length = selected_range.length
+        else:
+            return None
+
+        start = max(0, int(start))
+        length = max(0, int(length))
+        end = min(len(current_value), start + length)
+        if start > len(current_value):
+            start = len(current_value)
+
+        return f"{current_value[:start]}{inserted_text}{current_value[end:]}"
+
+    def _set_ax_value(self, element: object, attribute: str, value: object) -> bool:
+        try:
+            error_code = AS.AXUIElementSetAttributeValue(element, attribute, value)
+        except Exception:  # noqa: BLE001
+            return False
+        return error_code == AS.kAXErrorSuccess
+
+    def _paste_clipboard(self, target_bundle_id: str | None) -> None:
+        script_lines = []
+        if target_bundle_id:
+            escaped_bundle_id = target_bundle_id.replace('"', '\\"')
+            script_lines.append(f'tell application id "{escaped_bundle_id}" to activate')
+            script_lines.append("delay 0.05")
+        script_lines.extend(
+            [
+                'tell application "System Events"',
+                '    keystroke "v" using command down',
+                "end tell",
+            ]
+        )
+        script = "\n".join(script_lines)
         try:
             subprocess.run(
                 ["osascript", "-e", script],

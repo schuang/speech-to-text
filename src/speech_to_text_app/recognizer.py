@@ -39,6 +39,7 @@ class ManualDictationSession:
 
         self._recorder: ManualAudioRecorder | None = None
         self._transcription_thread: threading.Thread | None = None
+        self._injection_target: object | None = None
 
     @property
     def recording(self) -> bool:
@@ -57,10 +58,12 @@ class ManualDictationSession:
             chunk_ms=self.config.chunk_ms,
             on_level=self.on_level,
         )
+        self._injection_target = self.injector.capture_target()
         try:
             self._recorder.start()
         except AudioRecorderError as error:
             self._recorder = None
+            self._injection_target = None
             self.on_status(f"Error: {error}")
             return
         self.on_level(0.0)
@@ -97,6 +100,14 @@ class ManualDictationSession:
             self._recorder.close()
             self._recorder = None
 
+    def restore_target_focus(self) -> None:
+        if self._injection_target is None:
+            return
+        try:
+            self.injector.restore_target(self._injection_target)
+        except Exception:  # noqa: BLE001
+            LOGGER.exception("Unable to restore captured target focus.")
+
     def _transcribe_and_inject(self, audio_bytes: bytes) -> None:
         try:
             transcript = self.provider.transcribe_audio(audio_bytes).strip()
@@ -112,7 +123,7 @@ class ManualDictationSession:
 
             self.on_final(transcript)
             try:
-                self.injector.type_text(committed_text)
+                self.injector.type_text(committed_text, target=self._injection_target)
             except (OSError, TextInjectorError) as error:
                 self.on_status(f"Typing failed: {error}")
                 return
@@ -126,3 +137,5 @@ class ManualDictationSession:
         except Exception as error:  # noqa: BLE001
             LOGGER.exception("Unexpected error during dictation.")
             self.on_status(f"Error: {error}")
+        finally:
+            self._injection_target = None
