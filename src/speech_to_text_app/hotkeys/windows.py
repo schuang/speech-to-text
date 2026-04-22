@@ -59,18 +59,23 @@ def parse_hotkey(hotkey: str) -> tuple[int, int]:
         else:
             raise WindowsHotkeyError(f"Unsupported hotkey token: {part}")
 
-    if modifiers == 0 or keycode == 0:
+    if keycode == 0:
         raise WindowsHotkeyError(
-            "Hotkey must include at least one modifier and one key, for example ctrl+alt+space."
+            "Hotkey must include a key, for example f6 or ctrl+alt+space."
+        )
+    if modifiers == 0 and not (0x70 <= keycode <= 0x87):
+        raise WindowsHotkeyError(
+            "Single-key global hotkeys are limited to function keys such as f6."
         )
 
     return modifiers, keycode
 
 
 class WindowsHotkeyListener:
-    def __init__(self, hotkey: str, callback) -> None:
+    def __init__(self, hotkey: str, callback, release_callback=None) -> None:
         self.hotkey = hotkey
         self.callback = callback
+        self.release_callback = release_callback
         self._thread: threading.Thread | None = None
         self._thread_id: int | None = None
         self._ready = threading.Event()

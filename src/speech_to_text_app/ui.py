@@ -15,16 +15,18 @@ from .recording_meter import RecordingMeter
 
 
 class DictationApp(tk.Tk):
+    _DEFAULT_HOTKEY = "f6" if sys.platform == "darwin" else "ctrl+alt+space"
+
     def __init__(self) -> None:
         super().__init__()
         self.title("Speech To Text Dictation")
-        self.geometry("420x520")
-        self.minsize(400, 460)
+        self.geometry("460x560")
+        self.minsize(430, 500)
         self._icon_image: tk.PhotoImage | None = None
         self._set_window_icon()
 
         default_config = AppConfig.from_env()
-        self.provider_var = tk.StringVar(value=default_config.provider)
+        self._provider = default_config.normalized_provider
         self.project_id_var = tk.StringVar(value=default_config.project_id)
         self.language_var = tk.StringVar(value=default_config.language_code)
         self.model_var = tk.StringVar(value=default_config.resolved_model)
@@ -60,51 +62,73 @@ class DictationApp(tk.Tk):
         config_frame = ttk.Frame(self, padding=16)
         config_frame.grid(row=0, column=0, sticky="ew")
         config_frame.columnconfigure(1, weight=1)
+        row = 0
 
+        provider_name = "OpenAI" if self._provider == "openai" else "Google Cloud"
         ttk.Label(config_frame, text="Provider").grid(
-            row=0, column=0, sticky="w", pady=(0, 8)
+            row=row, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Entry(config_frame, textvariable=self.provider_var).grid(
-            row=0, column=1, sticky="ew", pady=(0, 8)
+        ttk.Label(config_frame, text=provider_name).grid(
+            row=row, column=1, sticky="w", pady=(0, 8)
         )
+        row += 1
 
-        ttk.Label(config_frame, text="Google Cloud Project ID (GCP only)").grid(
-            row=1, column=0, sticky="w", pady=(0, 8)
-        )
-        ttk.Entry(config_frame, textvariable=self.project_id_var).grid(
-            row=1, column=1, sticky="ew", pady=(0, 8)
-        )
+        if self._provider == "openai":
+            ttk.Label(config_frame, text="API Key").grid(
+                row=row, column=0, sticky="w", pady=(0, 8)
+            )
+            ttk.Label(config_frame, text="Loaded from OPENAI_API_KEY").grid(
+                row=row, column=1, sticky="w", pady=(0, 8)
+            )
+            row += 1
+        else:
+            ttk.Label(config_frame, text="Google Cloud Project ID").grid(
+                row=row, column=0, sticky="w", pady=(0, 8)
+            )
+            ttk.Entry(config_frame, textvariable=self.project_id_var).grid(
+                row=row, column=1, sticky="ew", pady=(0, 8)
+            )
+            row += 1
+
+            ttk.Label(config_frame, text="Location").grid(
+                row=row, column=0, sticky="w", pady=(0, 8)
+            )
+            ttk.Entry(config_frame, textvariable=self.location_var).grid(
+                row=row, column=1, sticky="ew", pady=(0, 8)
+            )
+            row += 1
 
         ttk.Label(config_frame, text="Language Code").grid(
-            row=2, column=0, sticky="w", pady=(0, 8)
+            row=row, column=0, sticky="w", pady=(0, 8)
         )
         ttk.Entry(config_frame, textvariable=self.language_var).grid(
-            row=2, column=1, sticky="ew", pady=(0, 8)
+            row=row, column=1, sticky="ew", pady=(0, 8)
         )
+        row += 1
 
         ttk.Label(config_frame, text="Model").grid(
-            row=3, column=0, sticky="w", pady=(0, 8)
+            row=row, column=0, sticky="w", pady=(0, 8)
         )
         ttk.Entry(config_frame, textvariable=self.model_var).grid(
-            row=3, column=1, sticky="ew", pady=(0, 8)
+            row=row, column=1, sticky="ew", pady=(0, 8)
         )
-
-        ttk.Label(config_frame, text="Location (GCP only)").grid(
-            row=4, column=0, sticky="w", pady=(0, 8)
-        )
-        ttk.Entry(config_frame, textvariable=self.location_var).grid(
-            row=4, column=1, sticky="ew", pady=(0, 8)
-        )
+        row += 1
 
         ttk.Label(config_frame, text="Global Hotkey").grid(
-            row=5, column=0, sticky="w", pady=(0, 8)
+            row=row, column=0, sticky="w", pady=(0, 8)
         )
         ttk.Entry(config_frame, textvariable=self.hotkey_var).grid(
-            row=5, column=1, sticky="ew", pady=(0, 8)
+            row=row, column=1, sticky="ew", pady=(0, 8)
         )
+        ttk.Button(
+            config_frame,
+            text="Apply",
+            command=self._restart_hotkey_listener,
+        ).grid(row=row, column=2, sticky="w", padx=(8, 0), pady=(0, 8))
+        row += 1
 
         button_row = ttk.Frame(config_frame)
-        button_row.grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        button_row.grid(row=row, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
         self.start_button = ttk.Button(
             button_row, text="Start Recording", command=self._start_session
@@ -136,11 +160,13 @@ class DictationApp(tk.Tk):
             content,
             text=(
                 "Usage: click Start Recording, speak your full prompt or paragraph, "
-                "then click Stop And Transcribe. The global hotkey also toggles start "
-                "and stop where supported. Final transcript text is typed into the "
-                "active window."
+                "then click Stop And Transcribe. On macOS, the default hotkey is F6: "
+                "press and hold F6 to record, then release to transcribe, paste into "
+                "the focused app, and "
+                "copy the transcript to the clipboard. The manual buttons remain as a "
+                "fallback."
             ),
-            wraplength=360,
+            wraplength=400,
             justify="left",
         ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
@@ -165,14 +191,7 @@ class DictationApp(tk.Tk):
         if self._session is not None and (self._session.recording or self._session.transcribing):
             return
 
-        provider = self.provider_var.get().strip().lower() or "gcp"
-        if provider not in {"gcp", "openai"}:
-            messagebox.showerror(
-                "Unsupported provider",
-                "Provider must be either 'gcp' or 'openai'.",
-            )
-            return
-
+        provider = self._provider
         project_id = self.project_id_var.get().strip()
         if provider == "gcp" and not project_id:
             messagebox.showerror(
@@ -193,7 +212,7 @@ class DictationApp(tk.Tk):
             language_code=self.language_var.get().strip() or "en-US",
             model=self.model_var.get().strip()
             or ("gpt-4o-mini-transcribe" if provider == "openai" else "chirp_3"),
-            hotkey=self.hotkey_var.get().strip() or "ctrl+alt+space",
+            hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
             recognizer_location=self.location_var.get().strip() or "us",
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         )
@@ -240,7 +259,7 @@ class DictationApp(tk.Tk):
                 if payload in {
                     "No audio captured.",
                     "No speech detected.",
-                    "Transcription inserted.",
+                    "Transcript pasted into the focused app and copied to the clipboard.",
                 } or payload.startswith("Error:") or payload.startswith(
                     "Speech provider error:"
                 ) or payload.startswith("Typing failed:"):
@@ -249,6 +268,10 @@ class DictationApp(tk.Tk):
                     self.stop_button.configure(state="disabled")
                     if self._session is not None and not self._session.recording:
                         self._session = None
+            elif event_type == "hotkey_press":
+                self._handle_hotkey_press()
+            elif event_type == "hotkey_release":
+                self._handle_hotkey_release()
             elif event_type == "toggle":
                 self._toggle_recording()
             elif event_type == "final":
@@ -264,6 +287,17 @@ class DictationApp(tk.Tk):
         self.final_text.see("end")
         self.final_text.configure(state="disabled")
 
+    def _handle_hotkey_press(self) -> None:
+        if self._session is not None and self._session.transcribing:
+            self.status_var.set("Transcription still in progress.")
+            return
+
+        self._start_session()
+
+    def _handle_hotkey_release(self) -> None:
+        if self._session is not None and self._session.recording:
+            self._stop_session()
+
     def _toggle_recording(self) -> None:
         if self._session is not None and self._session.recording:
             self._stop_session()
@@ -275,14 +309,34 @@ class DictationApp(tk.Tk):
 
         self._start_session()
 
+    def _restart_hotkey_listener(self) -> None:
+        self._start_hotkey_listener()
+
     def _start_hotkey_listener(self) -> None:
-        hotkey = self.hotkey_var.get().strip() or "ctrl+alt+space"
+        hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY
+
+        if self._hotkey_listener is not None:
+            self._hotkey_listener.stop()
+            self._hotkey_listener = None
+
         try:
+            if sys.platform == "darwin":
+                callback = lambda: self._events.put(("hotkey_press", ""))
+                release_callback = lambda: self._events.put(("hotkey_release", ""))
+            else:
+                callback = lambda: self._events.put(("toggle", ""))
+                release_callback = None
+
             self._hotkey_listener = build_hotkey_listener(
-                hotkey=hotkey, callback=lambda: self._events.put(("toggle", ""))
+                hotkey=hotkey,
+                callback=callback,
+                release_callback=release_callback,
             )
             self._hotkey_listener.start()
-            self.status_var.set(f"Idle. Hotkey ready: {hotkey}")
+            if sys.platform == "darwin":
+                self.status_var.set(f"Idle. Hold hotkey to talk: {hotkey}")
+            else:
+                self.status_var.set(f"Idle. Toggle hotkey ready: {hotkey}")
         except HotkeyError as error:
             self._hotkey_listener = None
             self.status_var.set(f"Hotkey unavailable: {error}")

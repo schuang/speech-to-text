@@ -1,7 +1,23 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
+
+
+def _default_hotkey() -> str:
+    if sys.platform == "darwin":
+        return "f6"
+    return "ctrl+alt+space"
+
+
+def _resolve_provider_from_env() -> str:
+    explicit_provider = os.getenv("SPEECH_PROVIDER", "").strip().lower()
+    if explicit_provider in {"gcp", "openai"}:
+        return explicit_provider
+    if os.getenv("OPENAI_API_KEY", "").strip():
+        return "openai"
+    return "gcp"
 
 
 @dataclass(frozen=True)
@@ -10,7 +26,7 @@ class AppConfig:
     project_id: str = ""
     language_code: str = "en-US"
     model: str = "chirp_3"
-    hotkey: str = "ctrl+alt+space"
+    hotkey: str = _default_hotkey()
     recognizer_location: str = "us"
     recognizer_id: str = "_"
     openai_api_key: str = ""
@@ -53,9 +69,10 @@ class AppConfig:
 
     @classmethod
     def from_env(cls) -> "AppConfig":
-        provider = os.getenv("SPEECH_PROVIDER", "gcp").strip().lower() or "gcp"
+        provider = _resolve_provider_from_env()
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
-        hotkey = os.getenv("DICTATION_HOTKEY", "ctrl+alt+space").strip() or "ctrl+alt+space"
+        default_hotkey = _default_hotkey()
+        hotkey = os.getenv("DICTATION_HOTKEY", default_hotkey).strip() or default_hotkey
         recognizer_location = os.getenv("GOOGLE_CLOUD_LOCATION", "us").strip() or "us"
         openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
         default_model = "gpt-4o-mini-transcribe" if provider == "openai" else "chirp_3"

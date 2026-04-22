@@ -8,7 +8,7 @@ from google.api_core import exceptions as google_exceptions
 
 from .audio import AudioRecorderError, ManualAudioRecorder
 from .config import AppConfig
-from .injectors import TextInjector
+from .injectors import TextInjector, TextInjectorError
 from .providers import SpeechProvider, build_speech_provider
 
 
@@ -64,7 +64,7 @@ class ManualDictationSession:
             self.on_status(f"Error: {error}")
             return
         self.on_level(0.0)
-        self.on_status("Recording. Press Stop when your utterance is complete.")
+        self.on_status("Recording...")
 
     def stop_recording(self) -> None:
         if not self.recording or self._recorder is None:
@@ -113,11 +113,11 @@ class ManualDictationSession:
             self.on_final(transcript)
             try:
                 self.injector.type_text(committed_text)
-            except OSError as error:
+            except (OSError, TextInjectorError) as error:
                 self.on_status(f"Typing failed: {error}")
                 return
 
-            self.on_status("Transcription inserted.")
+            self.on_status("Transcript pasted into the focused app and copied to the clipboard.")
 
         except google_exceptions.GoogleAPICallError as error:
             LOGGER.exception("Speech provider error during dictation.")

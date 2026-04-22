@@ -2,17 +2,30 @@
 .tmp/
 .pip-cache/
 .virtualenv-appdata/
+.env
+.env.*
 
 # Python cache and packaging artifacts
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*$py.class
 *.egg-info/
 dist/
 build/
+.eggs/
+.coverage
+.coverage.*
+htmlcov/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.ipynb_checkpoints/
 
 # Local tooling and editor files
 .DS_Store
