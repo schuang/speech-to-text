@@ -4,7 +4,11 @@ import sys
 
 from .base import TextInjector, TextInjectorError
 from .linux import LinuxTextInjector
-from .macos import MacOSTextInjector
+
+if sys.platform == "darwin":
+    from .macos import MacOSTextInjector
+else:
+    MacOSTextInjector = None
 
 if sys.platform == "win32":
     from .windows import WindowsTextInjector
