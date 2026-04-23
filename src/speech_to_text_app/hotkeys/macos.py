@@ -3,7 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pynput import keyboard
-from Quartz import CGEventGetIntegerValueField, kCGKeyboardEventKeycode
+
+try:
+    from Quartz import CGEventGetIntegerValueField, kCGKeyboardEventKeycode
+except ImportError:
+    def CGEventGetIntegerValueField(_event, _field):
+        raise RuntimeError("Quartz is unavailable on this platform.")
+
+    kCGKeyboardEventKeycode = 0
 
 from .base import HotkeyError
 

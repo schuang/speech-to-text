@@ -2,9 +2,49 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 
-import ApplicationServices as AS
+try:
+    import ApplicationServices as AS
+except ImportError:
+    class _ApplicationServicesStub:
+        kAXErrorSuccess = 0
+        kAXFocusedApplicationAttribute = "AXFocusedApplication"
+        kAXFocusedUIElementAttribute = "AXFocusedUIElement"
+        kAXRaiseAction = "AXRaise"
+        kAXFocusedAttribute = "AXFocused"
+        kAXSelectedTextRangeAttribute = "AXSelectedTextRange"
+        kAXSelectedTextAttribute = "AXSelectedText"
+        kAXValueAttribute = "AXValue"
+        kAXValueCFRangeType = "AXValueCFRangeType"
+
+        class CFRange:
+            def __init__(self, location: int = 0, length: int = 0) -> None:
+                self.location = location
+                self.length = length
+
+        @staticmethod
+        def AXUIElementCreateSystemWide() -> None:
+            return None
+
+        @staticmethod
+        def AXUIElementCopyAttributeValue(_element, _attribute, _unused) -> tuple[int, None]:
+            return (1, None)
+
+        @staticmethod
+        def AXUIElementPerformAction(_element, _action) -> int:
+            return 1
+
+        @staticmethod
+        def AXUIElementSetAttributeValue(_element, _attribute, _value) -> int:
+            return 1
+
+        @staticmethod
+        def AXValueGetValue(_value, _value_type, _unused) -> tuple[bool, None]:
+            return (False, None)
+
+    AS = _ApplicationServicesStub()
 
 from .base import TextInjectorError
 
@@ -26,8 +66,9 @@ class MacOSInjectionTarget:
 class MacOSTextInjector:
     def __init__(self, delay_seconds: float = 0.0) -> None:
         del delay_seconds
-        self._require_tool("osascript")
-        self._require_tool("pbcopy")
+        if sys.platform == "darwin":
+            self._require_tool("osascript")
+            self._require_tool("pbcopy")
 
     def capture_target(self) -> MacOSInjectionTarget | None:
         system = AS.AXUIElementCreateSystemWide()
