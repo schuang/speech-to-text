@@ -27,6 +27,7 @@ This project is a small desktop app written in Python. It records your speech be
 - For Linux audio capture with `sounddevice`: PortAudio must be installed at the system level
 - For macOS text injection: grant Accessibility access to your terminal app or Python app
 - For macOS global hotkeys: Accessibility access is also required
+- For macOS remote terminals in RustDesk: the app now uses `Ctrl+Shift+V` by default when the focused target is RustDesk. Override with `DICTATION_MACOS_REMOTE_PASTE_SHORTCUT` if your remote terminal expects a different paste chord.
 
 ## Setup
 
@@ -112,6 +113,14 @@ This project is a small desktop app written in Python. It records your speech be
 
    ```powershell
    $env:DICTATION_HOTKEY="ctrl+shift+space"
+   ```
+
+   Optional on macOS: override the local paste chord or the RustDesk remote paste chord.
+
+   ```bash
+   export DICTATION_MACOS_PASTE_SHORTCUT="command+v"
+   export DICTATION_MACOS_REMOTE_PASTE_SHORTCUT="ctrl+shift+v"
+   export DICTATION_MACOS_REMOTE_PASTE_TARGETS="RustDesk"
    ```
 
    For OpenAI:
@@ -258,6 +267,8 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The default Ollama model is `gemma4:default`, but `OLLAMA_MODEL` overrides it.
 - The default GCP location is `us`.
 - Windows text injection uses Unicode keyboard events.
+- On macOS, local apps default to `Command+V` for clipboard paste fallback.
+- On macOS, targets whose app name or bundle ID matches `DICTATION_MACOS_REMOTE_PASTE_TARGETS` default to `Ctrl+Shift+V` for clipboard paste fallback. This is intended for remote terminals shown through RustDesk.
 - Windows shows a small live recording meter while audio is being captured.
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.
 - macOS text injection uses `pbcopy` and `osascript`, and requires Accessibility permission.

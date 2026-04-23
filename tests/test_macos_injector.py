@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import patch
 
@@ -29,6 +30,7 @@ class MacOSTextInjectorTests(unittest.TestCase):
             window=None,
             element=object(),
             bundle_id="com.apple.Terminal",
+            app_name="Terminal",
         )
 
         with patch.object(injector, "_copy_to_clipboard") as copy_mock, patch.object(
@@ -50,7 +52,68 @@ class MacOSTextInjectorTests(unittest.TestCase):
         copy_mock.assert_called_once_with("echo hi")
         restore_mock.assert_called_once_with(target)
         insert_mock.assert_not_called()
-        paste_mock.assert_called_once_with(None)
+        paste_mock.assert_called_once_with(None, shortcut="command+v")
+
+    def test_rustdesk_target_uses_remote_paste_shortcut(self) -> None:
+        injector = MacOSTextInjector()
+        target = MacOSInjectionTarget(
+            app=None,
+            window=None,
+            element=object(),
+            bundle_id="com.carriez.RustDesk",
+            app_name="RustDesk",
+        )
+
+        with patch.object(injector, "_copy_to_clipboard"), patch.object(
+            injector,
+            "_restore_focus_target",
+        ), patch.object(
+            injector,
+            "_insert_text_into_target",
+            return_value=False,
+        ) as insert_mock, patch.object(
+            injector,
+            "_frontmost_bundle_id",
+            return_value="com.carriez.RustDesk",
+        ), patch.object(
+            injector,
+            "_paste_clipboard",
+        ) as paste_mock:
+            injector.type_text("echo hi", target=target)
+
+        insert_mock.assert_not_called()
+        paste_mock.assert_called_once_with(None, shortcut="ctrl+shift+v")
+
+    def test_paste_clipboard_builds_ctrl_shift_v_applescript(self) -> None:
+        injector = MacOSTextInjector()
+
+        with patch(
+            "speech_to_text_app.injectors.macos.subprocess.run",
+        ) as run_mock:
+            injector._paste_clipboard(None, shortcut="ctrl+shift+v")
+
+        self.assertEqual(run_mock.call_count, 1)
+        invoked_args = run_mock.call_args.args[0]
+        self.assertEqual(invoked_args[:2], ["osascript", "-e"])
+        script = invoked_args[2]
+        self.assertIn('keystroke "v" using {control down, shift down}', script)
+
+    def test_remote_paste_targets_can_be_disabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"DICTATION_MACOS_REMOTE_PASTE_TARGETS": ""},
+            clear=False,
+        ):
+            injector = MacOSTextInjector()
+
+        target = MacOSInjectionTarget(
+            app=None,
+            window=None,
+            element=None,
+            bundle_id="com.carriez.RustDesk",
+            app_name="RustDesk",
+        )
+        self.assertEqual(injector._paste_shortcut_for_target(target), "command+v")
 
 
 if __name__ == "__main__":

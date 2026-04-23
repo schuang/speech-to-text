@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -53,6 +54,23 @@ _TERMINAL_BUNDLE_IDS = {
     "com.apple.Terminal",
     "com.googlecode.iterm2",
 }
+_DEFAULT_PASTE_SHORTCUT = "command+v"
+_DEFAULT_REMOTE_PASTE_SHORTCUT = "ctrl+shift+v"
+_DEFAULT_REMOTE_PASTE_TARGETS = ("rustdesk",)
+_MODIFIER_ALIASES = {
+    "alt": "option down",
+    "cmd": "command down",
+    "command": "command down",
+    "control": "control down",
+    "ctrl": "control down",
+    "option": "option down",
+    "shift": "shift down",
+}
+_SPECIAL_KEY_CODES = {
+    "enter": 36,
+    "return": 36,
+    "tab": 48,
+}
 
 
 @dataclass(frozen=True)
@@ -61,11 +79,21 @@ class MacOSInjectionTarget:
     window: object | None
     element: object | None
     bundle_id: str | None
+    app_name: str | None
 
 
 class MacOSTextInjector:
     def __init__(self, delay_seconds: float = 0.0) -> None:
         del delay_seconds
+        self._default_paste_shortcut = (
+            os.getenv("DICTATION_MACOS_PASTE_SHORTCUT", "").strip()
+            or _DEFAULT_PASTE_SHORTCUT
+        )
+        self._remote_paste_shortcut = (
+            os.getenv("DICTATION_MACOS_REMOTE_PASTE_SHORTCUT", "").strip()
+            or _DEFAULT_REMOTE_PASTE_SHORTCUT
+        )
+        self._remote_paste_targets = self._load_remote_paste_targets()
         if sys.platform == "darwin":
             self._require_tool("osascript")
             self._require_tool("pbcopy")
@@ -75,9 +103,10 @@ class MacOSTextInjector:
         app = self._copy_ax_value(system, AS.kAXFocusedApplicationAttribute)
         element = self._copy_ax_value(system, AS.kAXFocusedUIElementAttribute)
         window = self._copy_ax_value(app, "AXFocusedWindow") if app is not None else None
+        app_name = self._frontmost_app_name()
         bundle_id = self._frontmost_bundle_id()
 
-        if app is None and element is None and bundle_id is None:
+        if app is None and element is None and bundle_id is None and app_name is None:
             return None
 
         return MacOSInjectionTarget(
@@ -85,6 +114,7 @@ class MacOSTextInjector:
             window=window,
             element=element,
             bundle_id=bundle_id,
+            app_name=app_name,
         )
 
     def restore_target(self, target: object | None) -> None:
@@ -112,12 +142,15 @@ class MacOSTextInjector:
             target_bundle_id and target_bundle_id != current_bundle_id
         )
         self._paste_clipboard(
-            target_bundle_id if should_activate_target else None
+            target_bundle_id if should_activate_target else None,
+            shortcut=self._paste_shortcut_for_target(macos_target),
         )
 
     def _should_use_ax_insertion(self, target: MacOSInjectionTarget) -> bool:
         bundle_id = (target.bundle_id or "").strip()
-        return bundle_id not in _TERMINAL_BUNDLE_IDS
+        return bundle_id not in _TERMINAL_BUNDLE_IDS and not self._is_remote_paste_target(
+            target
+        )
 
     def _require_tool(self, tool_name: str) -> None:
         if shutil.which(tool_name):
@@ -140,6 +173,18 @@ class MacOSTextInjector:
             message = error.stderr.strip() or str(error)
             raise TextInjectorError(message) from error
 
+    def _frontmost_app_name(self) -> str | None:
+        script = (
+            'tell application "System Events"\n'
+            '    try\n'
+            '        return name of first application process whose frontmost is true\n'
+            '    on error\n'
+            '        return ""\n'
+            '    end try\n'
+            "end tell"
+        )
+        return self._run_osascript_text(script)
+
     def _frontmost_bundle_id(self) -> str | None:
         script = (
             'tell application "System Events"\n'
@@ -150,6 +195,9 @@ class MacOSTextInjector:
             '    end try\n'
             "end tell"
         )
+        return self._run_osascript_text(script)
+
+    def _run_osascript_text(self, script: str) -> str | None:
         try:
             result = subprocess.run(
                 ["osascript", "-e", script],
@@ -163,6 +211,16 @@ class MacOSTextInjector:
 
         target = result.stdout.strip()
         return target or None
+
+    def _load_remote_paste_targets(self) -> tuple[str, ...]:
+        configured_targets = os.getenv("DICTATION_MACOS_REMOTE_PASTE_TARGETS")
+        if configured_targets is None:
+            return _DEFAULT_REMOTE_PASTE_TARGETS
+        return tuple(
+            normalized_target
+            for raw_target in configured_targets.split(",")
+            if (normalized_target := raw_target.strip().lower())
+        )
 
     def _copy_ax_value(self, element: object | None, attribute: str) -> object | None:
         if element is None:
@@ -270,7 +328,67 @@ class MacOSTextInjector:
             return False
         return error_code == AS.kAXErrorSuccess
 
-    def _paste_clipboard(self, target_bundle_id: str | None) -> None:
+    def _paste_shortcut_for_target(
+        self,
+        target: MacOSInjectionTarget | None,
+    ) -> str:
+        if target is None or not self._is_remote_paste_target(target):
+            return self._default_paste_shortcut
+        return self._remote_paste_shortcut
+
+    def _is_remote_paste_target(self, target: MacOSInjectionTarget) -> bool:
+        if not self._remote_paste_targets:
+            return False
+
+        candidates = [
+            (target.bundle_id or "").strip().lower(),
+            (target.app_name or "").strip().lower(),
+        ]
+        return any(
+            configured_target in candidate
+            for configured_target in self._remote_paste_targets
+            for candidate in candidates
+            if candidate
+        )
+
+    def _shortcut_to_applescript(self, shortcut: str) -> str:
+        tokens = [token.strip().lower() for token in shortcut.split("+") if token.strip()]
+        if not tokens:
+            raise TextInjectorError("macOS paste shortcut cannot be empty.")
+
+        key_token = tokens[-1]
+        modifier_tokens = tokens[:-1]
+        modifiers: list[str] = []
+
+        for modifier_token in modifier_tokens:
+            applescript_modifier = _MODIFIER_ALIASES.get(modifier_token)
+            if applescript_modifier is None:
+                raise TextInjectorError(
+                    f"Unsupported macOS paste shortcut modifier: {modifier_token}"
+                )
+            modifiers.append(applescript_modifier)
+
+        if len(key_token) == 1:
+            escaped_key = key_token.replace("\\", "\\\\").replace('"', '\\"')
+            keystroke_command = f'keystroke "{escaped_key}"'
+        elif key_token == "space":
+            keystroke_command = 'keystroke " "'
+        elif key_token in _SPECIAL_KEY_CODES:
+            keystroke_command = f"key code {_SPECIAL_KEY_CODES[key_token]}"
+        else:
+            raise TextInjectorError(f"Unsupported macOS paste shortcut key: {key_token}")
+
+        if not modifiers:
+            return keystroke_command
+        return f"{keystroke_command} using {{{', '.join(modifiers)}}}"
+
+    def _paste_clipboard(
+        self,
+        target_bundle_id: str | None,
+        shortcut: str | None = None,
+    ) -> None:
+        paste_shortcut = shortcut or self._default_paste_shortcut
+        shortcut_script = self._shortcut_to_applescript(paste_shortcut)
         script_lines = []
         if target_bundle_id:
             escaped_bundle_id = target_bundle_id.replace('"', '\\"')
@@ -279,7 +397,7 @@ class MacOSTextInjector:
         script_lines.extend(
             [
                 'tell application "System Events"',
-                '    keystroke "v" using command down',
+                f"    {shortcut_script}",
                 "end tell",
             ]
         )
