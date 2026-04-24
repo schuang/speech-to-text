@@ -4,6 +4,49 @@ import sys
 import tkinter as tk
 
 
+def _clamp(value: int, minimum: int, maximum: int) -> int:
+    if minimum > maximum:
+        return minimum
+    return max(minimum, min(value, maximum))
+
+
+def compute_indicator_position(
+    *,
+    screen_x: int,
+    screen_y: int,
+    screen_width: int,
+    screen_height: int,
+    parent_x: int,
+    parent_y: int,
+    parent_width: int,
+    parent_height: int,
+    indicator_width: int,
+    indicator_height: int,
+    gap: int = 12,
+    margin: int = 16,
+) -> tuple[int, int]:
+    min_x = screen_x + margin
+    min_y = screen_y + margin
+    max_x = screen_x + screen_width - indicator_width - margin
+    max_y = screen_y + screen_height - indicator_height - margin
+
+    candidates = [
+        (parent_x + parent_width + gap, parent_y),
+        (parent_x - indicator_width - gap, parent_y),
+        (parent_x, parent_y + parent_height + gap),
+        (parent_x, parent_y - indicator_height - gap),
+    ]
+    for candidate_x, candidate_y in candidates:
+        if min_x <= candidate_x <= max_x and min_y <= candidate_y <= max_y:
+            return candidate_x, candidate_y
+
+    preferred_x, preferred_y = candidates[0]
+    return (
+        _clamp(preferred_x, min_x, max_x),
+        _clamp(preferred_y, min_y, max_y),
+    )
+
+
 class FloatingRecordingIndicator:
     def __init__(self, parent: tk.Tk) -> None:
         self._parent = parent
@@ -14,6 +57,7 @@ class FloatingRecordingIndicator:
         self._release = 0.25
         self._mode = "hidden"
         self._hotkey = ""
+        self._last_parent_bounds: tuple[int, int, int, int] | None = None
 
         self._window = tk.Toplevel(parent)
         self._window.withdraw()
@@ -47,6 +91,8 @@ class FloatingRecordingIndicator:
             bg="#111111",
         )
         self._canvas.pack()
+        self._parent.bind("<Configure>", self._on_parent_configure, add="+")
+        self._parent.bind("<Map>", self._on_parent_configure, add="+")
         self._draw()
 
     def show_recording(self, hotkey: str) -> None:
@@ -89,13 +135,52 @@ class FloatingRecordingIndicator:
         self._window.deiconify()
         self._window.lift()
 
+    def _on_parent_configure(self, _event: tk.Event[tk.Misc]) -> None:
+        self._cache_parent_bounds()
+        if self._mode != "hidden":
+            self._position_window()
+
     def _position_window(self) -> None:
+        self._parent.update_idletasks()
         self._window.update_idletasks()
         width = max(self._canvas.winfo_width(), int(self._canvas["width"]))
         height = max(self._canvas.winfo_height(), int(self._canvas["height"]))
-        x = max(16, self._parent.winfo_screenwidth() - width - 28)
-        y = 28
+        screen_x = self._parent.winfo_vrootx()
+        screen_y = self._parent.winfo_vrooty()
+        screen_width = self._parent.winfo_vrootwidth()
+        screen_height = self._parent.winfo_vrootheight()
+        parent_x, parent_y, parent_width, parent_height = self._get_parent_bounds()
+        x, y = compute_indicator_position(
+            screen_x=screen_x,
+            screen_y=screen_y,
+            screen_width=screen_width,
+            screen_height=screen_height,
+            parent_x=parent_x,
+            parent_y=parent_y,
+            parent_width=parent_width,
+            parent_height=parent_height,
+            indicator_width=width,
+            indicator_height=height,
+        )
         self._window.geometry(f"{width}x{height}+{x}+{y}")
+
+    def _get_parent_bounds(self) -> tuple[int, int, int, int]:
+        state = self._parent.state()
+        if state != "iconic":
+            return self._cache_parent_bounds()
+        if self._last_parent_bounds is not None:
+            return self._last_parent_bounds
+        return self._cache_parent_bounds()
+
+    def _cache_parent_bounds(self) -> tuple[int, int, int, int]:
+        bounds = (
+            self._parent.winfo_rootx(),
+            self._parent.winfo_rooty(),
+            max(self._parent.winfo_width(), self._parent.winfo_reqwidth()),
+            max(self._parent.winfo_height(), self._parent.winfo_reqheight()),
+        )
+        self._last_parent_bounds = bounds
+        return bounds
 
     def _draw(self) -> None:
         canvas = self._canvas
