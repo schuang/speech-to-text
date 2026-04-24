@@ -42,6 +42,10 @@ except ImportError:
             return 1
 
         @staticmethod
+        def AXUIElementGetPid(_element, _unused) -> tuple[int, None]:
+            return (1, None)
+
+        @staticmethod
         def AXValueGetValue(_value, _value_type, _unused) -> tuple[bool, None]:
             return (False, None)
 
@@ -80,11 +84,13 @@ class MacOSInjectionTarget:
     element: object | None
     bundle_id: str | None
     app_name: str | None
+    pid: int | None = None
 
 
 class MacOSTextInjector:
     def __init__(self, delay_seconds: float = 0.0) -> None:
         del delay_seconds
+        self._current_pid = os.getpid()
         self._default_paste_shortcut = (
             os.getenv("DICTATION_MACOS_PASTE_SHORTCUT", "").strip()
             or _DEFAULT_PASTE_SHORTCUT
@@ -115,26 +121,29 @@ class MacOSTextInjector:
             element=element,
             bundle_id=bundle_id,
             app_name=app_name,
+            pid=self._copy_ax_pid(app),
         )
 
     def restore_target(self, target: object | None) -> None:
         if isinstance(target, MacOSInjectionTarget):
             self._restore_focus_target(target)
 
-    def type_text(self, text: str, target: object | None = None) -> None:
+    def type_text(self, text: str, target: object | None = None) -> bool:
         if not text:
-            return
+            return False
 
         self._copy_to_clipboard(text)
 
         macos_target = target if isinstance(target, MacOSInjectionTarget) else None
+        if macos_target is not None and self._is_current_app_target(macos_target):
+            return False
         if macos_target is not None:
             self._restore_focus_target(macos_target)
             if self._should_use_ax_insertion(macos_target) and self._insert_text_into_target(
                 text,
                 macos_target,
             ):
-                return
+                return True
 
         target_bundle_id = macos_target.bundle_id if macos_target is not None else None
         current_bundle_id = self._frontmost_bundle_id()
@@ -145,6 +154,7 @@ class MacOSTextInjector:
             target_bundle_id if should_activate_target else None,
             shortcut=self._paste_shortcut_for_target(macos_target),
         )
+        return True
 
     def _should_use_ax_insertion(self, target: MacOSInjectionTarget) -> bool:
         bundle_id = (target.bundle_id or "").strip()
@@ -234,6 +244,40 @@ class MacOSTextInjector:
         if error_code != AS.kAXErrorSuccess:
             return None
         return value
+
+    def _copy_ax_pid(self, element: object | None) -> int | None:
+        if element is None:
+            return None
+
+        getter = getattr(AS, "AXUIElementGetPid", None)
+        if getter is None:
+            return None
+
+        try:
+            result = getter(element, None)
+        except TypeError:
+            try:
+                result = getter(element)
+            except Exception:  # noqa: BLE001
+                return None
+        except Exception:  # noqa: BLE001
+            return None
+
+        if isinstance(result, tuple):
+            if len(result) != 2:
+                return None
+            error_code, pid = result
+            if error_code != AS.kAXErrorSuccess or pid is None:
+                return None
+            return int(pid)
+
+        try:
+            return int(result)
+        except (TypeError, ValueError):
+            return None
+
+    def _is_current_app_target(self, target: MacOSInjectionTarget) -> bool:
+        return target.pid is not None and target.pid == self._current_pid
 
     def _restore_focus_target(self, target: MacOSInjectionTarget) -> None:
         if target.app is not None:

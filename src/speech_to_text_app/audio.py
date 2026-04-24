@@ -3,7 +3,33 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except ImportError:
+    class _SoundDeviceStub:
+        class PortAudioError(RuntimeError):
+            pass
+
+        class CallbackFlags:
+            pass
+
+        class RawInputStream:
+            def __init__(self, *args, **kwargs) -> None:
+                del args, kwargs
+                raise _SoundDeviceStub.PortAudioError(
+                    "sounddevice is required for microphone recording."
+                )
+
+            def start(self) -> None:
+                return None
+
+            def stop(self) -> None:
+                return None
+
+            def close(self) -> None:
+                return None
+
+    sd = _SoundDeviceStub()
 
 
 LOGGER = logging.getLogger(__name__)
