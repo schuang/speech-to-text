@@ -97,10 +97,10 @@ class WindowsTextInjector:
     def restore_target(self, target: object | None) -> None:
         del target
 
-    def type_text(self, text: str, target: object | None = None) -> None:
+    def type_text(self, text: str, target: object | None = None) -> bool:
         del target
         if not text:
-            return
+            return False
 
         try:
             for character in text:
@@ -113,6 +113,7 @@ class WindowsTextInjector:
                     time.sleep(self.delay_seconds)
         except OSError:
             self._paste_text(text)
+        return True
 
     def _send_unicode_character(self, character: str) -> None:
         utf16_units = character.encode("utf-16-le")

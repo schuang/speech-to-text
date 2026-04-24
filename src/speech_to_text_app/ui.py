@@ -284,6 +284,7 @@ class DictationApp(tk.Tk):
                 if payload in {
                     "No audio captured.",
                     "No speech detected.",
+                    "Transcript copied to the clipboard.",
                     "Transcript pasted into the focused app and copied to the clipboard.",
                 } or payload.startswith("Error:") or payload.startswith(
                     "Speech provider error:"

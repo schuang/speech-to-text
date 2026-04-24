@@ -20,6 +20,7 @@ class _FakeInjector:
 
     def type_text(self, text: str, target: object | None = None) -> None:
         self.calls.append((text, target))
+        return True
 
 
 class _FakeProvider:
@@ -97,6 +98,28 @@ class ManualDictationSessionTests(unittest.TestCase):
             statuses,
         )
         self.assertIsNone(session._injection_target)
+
+    def test_transcribe_without_insertion_reports_clipboard_only_status(self) -> None:
+        injector = _FakeInjector()
+        statuses: list[str] = []
+
+        def copy_only_type_text(text: str, target: object | None = None) -> bool:
+            injector.calls.append((text, target))
+            return False
+
+        injector.type_text = copy_only_type_text  # type: ignore[method-assign]
+        session = ManualDictationSession(
+            config=AppConfig(append_trailing_space=True),
+            injector=injector,
+            provider=_FakeProvider(),
+            on_status=statuses.append,
+        )
+        session._injection_target = "com.apple.Safari"
+
+        session._transcribe_and_inject(b"\x00\x00")
+
+        self.assertEqual(injector.calls, [("hello world ", "com.apple.Safari")])
+        self.assertIn("Transcript copied to the clipboard.", statuses)
 
 
 if __name__ == "__main__":

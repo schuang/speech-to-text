@@ -10,8 +10,8 @@ class TextInjector(Protocol):
     def restore_target(self, target: object | None) -> None:
         """Restore the previously captured insertion target, if supported."""
 
-    def type_text(self, text: str, target: object | None = None) -> None:
-        """Inject text into the active application."""
+    def type_text(self, text: str, target: object | None = None) -> bool:
+        """Inject text into the active application and report whether text was inserted."""
 
 
 class TextInjectorError(RuntimeError):

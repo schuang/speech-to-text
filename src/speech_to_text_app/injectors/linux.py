@@ -18,10 +18,10 @@ class LinuxTextInjector:
     def restore_target(self, target: object | None) -> None:
         del target
 
-    def type_text(self, text: str, target: object | None = None) -> None:
+    def type_text(self, text: str, target: object | None = None) -> bool:
         del target
         if not text:
-            return
+            return False
 
         lines = text.split("\n")
         for index, line in enumerate(lines):
@@ -29,6 +29,7 @@ class LinuxTextInjector:
                 self._type_line(line)
             if index < len(lines) - 1:
                 self._press_enter()
+        return True
 
     def _detect_backend(self) -> str:
         if os.getenv("WAYLAND_DISPLAY") and shutil.which("wtype"):

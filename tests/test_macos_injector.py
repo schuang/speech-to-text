@@ -115,6 +115,35 @@ class MacOSTextInjectorTests(unittest.TestCase):
         )
         self.assertEqual(injector._paste_shortcut_for_target(target), "command+v")
 
+    def test_current_app_target_stays_clipboard_only(self) -> None:
+        injector = MacOSTextInjector()
+        target = MacOSInjectionTarget(
+            app=None,
+            window=None,
+            element=object(),
+            bundle_id="org.python.python",
+            app_name="Python",
+            pid=injector._current_pid,
+        )
+
+        with patch.object(injector, "_copy_to_clipboard") as copy_mock, patch.object(
+            injector,
+            "_restore_focus_target",
+        ) as restore_mock, patch.object(
+            injector,
+            "_insert_text_into_target",
+        ) as insert_mock, patch.object(
+            injector,
+            "_paste_clipboard",
+        ) as paste_mock:
+            inserted = injector.type_text("echo hi", target=target)
+
+        self.assertFalse(inserted)
+        copy_mock.assert_called_once_with("echo hi")
+        restore_mock.assert_not_called()
+        insert_mock.assert_not_called()
+        paste_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
