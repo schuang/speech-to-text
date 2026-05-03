@@ -17,7 +17,7 @@ This project is a small desktop app written in Python. It records your speech be
 ## Requirements
 
 - Windows, Linux, or macOS
-- Python 3.11+ installed and available on `PATH`
+- `uv`, or Python 3.11+ installed and available on `PATH`
 - For GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
 - For OpenAI mode: an `OPENAI_API_KEY`
 - For Ollama mode: an `OLLAMA_BASE_URL` that points to a reachable Ollama server
@@ -30,6 +30,30 @@ This project is a small desktop app written in Python. It records your speech be
 - For macOS remote terminals in RustDesk: the app now uses `Ctrl+Shift+V` by default when the focused target is RustDesk. Override with `DICTATION_MACOS_REMOTE_PASTE_SHORTCUT` if your remote terminal expects a different paste chord.
 
 ## Setup
+
+### Using uv
+
+Install `uv` if needed:
+
+```cmd
+winget install --id=astral-sh.uv -e
+```
+
+Close and reopen your terminal, then sync the project dependencies from the project directory:
+
+```cmd
+cd %USERPROFILE%\Documents\speech-to-text
+uv sync
+```
+
+`uv sync` creates the project `.venv` and installs the package dependencies from `pyproject.toml`. If a compatible Python is not already installed, `uv` can download one automatically. To install a specific Python version first:
+
+```cmd
+uv python install 3.13
+uv sync
+```
+
+### Using venv and pip
 
 1. Install Python.
 2. Create the project virtual environment:
@@ -141,6 +165,35 @@ This project is a small desktop app written in Python. It records your speech be
 ## Run
 
 Set your provider environment in the current shell, then start the app.
+
+Windows Command Prompt with `uv`:
+
+```cmd
+cd %USERPROFILE%\Documents\speech-to-text
+set SPEECH_PROVIDER=gcp
+set GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+set GOOGLE_CLOUD_LOCATION=us
+uv run python -m speech_to_text_app
+```
+
+OpenAI from Windows Command Prompt with `uv`:
+
+```cmd
+cd %USERPROFILE%\Documents\speech-to-text
+set SPEECH_PROVIDER=openai
+set OPENAI_API_KEY=your-openai-api-key
+uv run python -m speech_to_text_app
+```
+
+Ollama from Windows Command Prompt with `uv`:
+
+```cmd
+cd %USERPROFILE%\Documents\speech-to-text
+set SPEECH_PROVIDER=ollama
+set OLLAMA_BASE_URL=http://your-ollama-host:11434
+set OLLAMA_MODEL=gemma4:default
+uv run python -m speech_to_text_app
+```
 
 Windows:
 
