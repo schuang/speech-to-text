@@ -7,7 +7,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from .config import AppConfig
+from .config import AppConfig, LANGUAGE_OPTIONS, language_code_for_selection
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
 from .recognizer import ManualDictationSession
@@ -29,7 +29,7 @@ class DictationApp(tk.Tk):
         default_config = AppConfig.from_env()
         self._provider = default_config.normalized_provider
         self.project_id_var = tk.StringVar(value=default_config.project_id)
-        self.language_var = tk.StringVar(value=default_config.language_code)
+        self.language_var = tk.StringVar(value=default_config.language_display_name)
         self.model_var = tk.StringVar(value=default_config.resolved_model)
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
         self.location_var = tk.StringVar(value=default_config.recognizer_location)
@@ -112,10 +112,15 @@ class DictationApp(tk.Tk):
             )
             row += 1
 
-        ttk.Label(config_frame, text="Language Code").grid(
+        ttk.Label(config_frame, text="Language").grid(
             row=row, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Entry(config_frame, textvariable=self.language_var).grid(
+        language_combo = ttk.Combobox(
+            config_frame,
+            textvariable=self.language_var,
+            values=[option.label for option in LANGUAGE_OPTIONS],
+        )
+        language_combo.grid(
             row=row, column=1, sticky="ew", pady=(0, 8)
         )
         row += 1
@@ -230,7 +235,7 @@ class DictationApp(tk.Tk):
         config = AppConfig(
             provider=provider,
             project_id=project_id,
-            language_code=self.language_var.get().strip() or "en-US",
+            language_code=language_code_for_selection(self.language_var.get()),
             model=self.model_var.get().strip() or self._default_model_for_provider(provider),
             hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
             recognizer_location=self.location_var.get().strip() or "us",

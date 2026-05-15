@@ -4,7 +4,11 @@ import os
 import unittest
 from unittest.mock import patch
 
-from speech_to_text_app.config import AppConfig
+from speech_to_text_app.config import (
+    AppConfig,
+    language_code_for_selection,
+    language_label_for_code,
+)
 
 
 class AppConfigTests(unittest.TestCase):
@@ -50,6 +54,23 @@ class AppConfigTests(unittest.TestCase):
         self.assertEqual(config.normalized_provider, "ollama")
         self.assertEqual(config.resolved_model, "gemma4:custom")
         self.assertEqual(config.ollama_chat_url, "http://ollama.example:11434/api/chat")
+
+    def test_language_selection_maps_taiwan_mandarin_to_canonical_code(self) -> None:
+        self.assertEqual(
+            language_code_for_selection("Chinese (Mandarin, Taiwan)"),
+            "cmn-Hant-TW",
+        )
+        self.assertEqual(language_code_for_selection("zh"), "cmn-Hant-TW")
+        self.assertEqual(language_code_for_selection("zh-TW"), "cmn-Hant-TW")
+        self.assertEqual(
+            language_label_for_code("cmn-Hant-TW"),
+            "Chinese (Mandarin, Taiwan)",
+        )
+
+    def test_openai_language_uses_zh_for_taiwan_mandarin(self) -> None:
+        config = AppConfig(language_code="cmn-Hant-TW")
+
+        self.assertEqual(config.openai_language, "zh")
 
 
 if __name__ == "__main__":

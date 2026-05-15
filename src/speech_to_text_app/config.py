@@ -9,6 +9,61 @@ _DEFAULT_OLLAMA_BASE_URL = ""
 _DEFAULT_OLLAMA_MODEL = "gemma4:default"
 
 
+@dataclass(frozen=True)
+class LanguageOption:
+    label: str
+    code: str
+    aliases: tuple[str, ...] = ()
+
+
+LANGUAGE_OPTIONS: tuple[LanguageOption, ...] = (
+    LanguageOption(label="English (United States)", code="en-US", aliases=("en",)),
+    LanguageOption(
+        label="Chinese (Mandarin, Taiwan)",
+        code="cmn-Hant-TW",
+        aliases=("zh", "cmn", "zh-TW", "zh-Hant-TW"),
+    ),
+)
+
+_DEFAULT_LANGUAGE_OPTION = LANGUAGE_OPTIONS[0]
+_LANGUAGE_CODE_BY_NORMALIZED_LABEL = {
+    option.label.lower(): option.code for option in LANGUAGE_OPTIONS
+}
+_LANGUAGE_CODE_BY_NORMALIZED_CODE = {
+    option.code.lower(): option.code for option in LANGUAGE_OPTIONS
+}
+_LANGUAGE_LABEL_BY_NORMALIZED_CODE = {
+    option.code.lower(): option.label for option in LANGUAGE_OPTIONS
+}
+_LANGUAGE_CODE_BY_ALIAS = {
+    alias.lower(): option.code
+    for option in LANGUAGE_OPTIONS
+    for alias in option.aliases
+}
+
+
+def language_code_for_selection(selection: str) -> str:
+    normalized_selection = selection.strip().lower()
+    if not normalized_selection:
+        return _DEFAULT_LANGUAGE_OPTION.code
+
+    return (
+        _LANGUAGE_CODE_BY_NORMALIZED_LABEL.get(normalized_selection)
+        or _LANGUAGE_CODE_BY_ALIAS.get(normalized_selection)
+        or _LANGUAGE_CODE_BY_NORMALIZED_CODE.get(normalized_selection)
+        or selection.strip()
+        or _DEFAULT_LANGUAGE_OPTION.code
+    )
+
+
+def language_label_for_code(language_code: str) -> str:
+    canonical_code = language_code_for_selection(language_code)
+    return _LANGUAGE_LABEL_BY_NORMALIZED_CODE.get(
+        canonical_code.lower(),
+        canonical_code,
+    )
+
+
 def _default_hotkey() -> str:
     if sys.platform == "darwin":
         return "ctrl+shift+space"
@@ -75,7 +130,14 @@ class AppConfig:
 
     @property
     def openai_language(self) -> str:
-        return self.language_code.split("-", 1)[0].lower()
+        language_code = language_code_for_selection(self.language_code).lower()
+        if language_code.startswith(("cmn-", "zh-")):
+            return "zh"
+        return language_code.split("-", 1)[0]
+
+    @property
+    def language_display_name(self) -> str:
+        return language_label_for_code(self.language_code)
 
     @property
     def ollama_chat_url(self) -> str:
