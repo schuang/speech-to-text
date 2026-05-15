@@ -266,6 +266,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
 - The default Ollama model is `gemma4:default`, but `OLLAMA_MODEL` overrides it.
 - The default GCP location is `us`.
+- The GUI language field is a dropdown with presets for English (United States) and Chinese (Mandarin, Taiwan). You can still type a locale manually if you need a different language code.
 - Windows text injection uses Unicode keyboard events.
 - On macOS, local apps default to `Command+V` for clipboard paste fallback.
 - On macOS, targets whose app name or bundle ID matches `DICTATION_MACOS_REMOTE_PASTE_TARGETS` default to `Ctrl+Shift+V` for clipboard paste fallback. This is intended for remote terminals shown through RustDesk.

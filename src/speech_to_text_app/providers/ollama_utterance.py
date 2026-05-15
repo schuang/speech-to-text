@@ -90,7 +90,7 @@ class OllamaUtteranceProvider:
 
     def _transcription_prompt(self) -> str:
         return (
-            f"Transcribe the spoken audio into {self.config.language_code} text. "
+            f"Transcribe the spoken audio into {self.config.language_display_name} text. "
             "Return only the final transcript with no commentary, labels, or markdown. "
             "If nothing intelligible is spoken, return an empty string."
         )
