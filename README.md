@@ -141,6 +141,14 @@ $env:GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 .\run.ps1
 ```
 
+Windows Command Prompt:
+
+```bat
+set SPEECH_PROVIDER=gcp
+set GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+run.cmd
+```
+
 Linux:
 
 ```bash
@@ -176,6 +184,14 @@ OpenAI example:
 $env:SPEECH_PROVIDER="openai"
 $env:OPENAI_API_KEY="your-openai-api-key"
 .\run.ps1
+```
+
+OpenAI from Windows Command Prompt:
+
+```bat
+set SPEECH_PROVIDER=openai
+set OPENAI_API_KEY=your-openai-api-key
+run.cmd
 ```
 
 Ollama example:
