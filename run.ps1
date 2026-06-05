@@ -8,6 +8,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$venvRoot = Join-Path $scriptRoot ".venv"
+$venvPython = Join-Path $venvRoot "Scripts\python.exe"
+$createdVenv = $false
+
 function Get-BootstrapPython {
     if ($env:PYTHON_EXE) {
         if (-not (Test-Path -LiteralPath $env:PYTHON_EXE)) {
@@ -42,13 +47,8 @@ function Get-BootstrapPython {
     )
 }
 
-$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$venvRoot = Join-Path $scriptRoot ".venv"
-$venvPython = Join-Path $venvRoot "Scripts\python.exe"
-$createdVenv = $false
-$bootstrapPython = Get-BootstrapPython
-
 if (-not (Test-Path -LiteralPath $venvPython)) {
+    $bootstrapPython = Get-BootstrapPython
     Write-Host "Creating virtual environment in $venvRoot..."
     & $bootstrapPython.Path @($bootstrapPython.Args + @("-m", "venv", $venvRoot))
     $createdVenv = $true
@@ -58,22 +58,19 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
     throw "Virtual environment Python not found at $venvPython"
 }
 
-$stdoutPath = [System.IO.Path]::GetTempFileName()
-$stderrPath = [System.IO.Path]::GetTempFileName()
-
 try {
-    $probe = Start-Process `
-        -FilePath $venvPython `
-        -ArgumentList @("-c", '"import speech_to_text_app"') `
-        -NoNewWindow `
-        -PassThru `
-        -Wait `
-        -RedirectStandardOutput $stdoutPath `
-        -RedirectStandardError $stderrPath
-    $packageInstalled = ($probe.ExitCode -eq 0)
+    if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+        $previousNativeErrorPreference = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    & $venvPython -c "import speech_to_text_app" *> $null
+    $packageInstalled = ($LASTEXITCODE -eq 0)
 }
 finally {
-    Remove-Item -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
+    if (Test-Path variable:previousNativeErrorPreference) {
+        $PSNativeCommandUseErrorActionPreference = $previousNativeErrorPreference
+    }
 }
 
 if ($createdVenv -or -not $packageInstalled) {
@@ -90,8 +87,14 @@ if (-not $Provider) {
 }
 
 $env:SPEECH_PROVIDER = $Provider
-$env:GOOGLE_CLOUD_PROJECT = $ProjectId
 $env:GOOGLE_CLOUD_LOCATION = $Location
+
+if ($ProjectId) {
+    $env:GOOGLE_CLOUD_PROJECT = $ProjectId
+}
+else {
+    $ProjectId = $env:GOOGLE_CLOUD_PROJECT
+}
 
 if ($SmokeTest) {
     Write-Output ("VIRTUAL_ENV=" + $venvRoot)
