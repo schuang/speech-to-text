@@ -4,15 +4,6 @@ import logging
 import threading
 from collections.abc import Callable
 
-try:
-    from google.api_core import exceptions as google_exceptions
-except ImportError:
-    class _GoogleExceptionsStub:
-        class GoogleAPICallError(Exception):
-            pass
-
-    google_exceptions = _GoogleExceptionsStub()
-
 from .audio import AudioRecorderError, ManualAudioRecorder
 from .config import AppConfig
 from .injectors import TextInjector, TextInjectorError
@@ -145,12 +136,8 @@ class ManualDictationSession:
             else:
                 self.on_status("Transcript copied to the clipboard.")
 
-        except google_exceptions.GoogleAPICallError as error:
-            LOGGER.exception("Speech provider error during dictation.")
-            message = getattr(error, "message", None) or str(error)
-            self.on_status(f"Speech provider error: {message}")
         except Exception as error:  # noqa: BLE001
-            LOGGER.exception("Unexpected error during dictation.")
-            self.on_status(f"Error: {error}")
+            LOGGER.exception("Transcription failed during dictation.")
+            self.on_status(f"Transcription failed: {error}")
         finally:
             self._injection_target = None

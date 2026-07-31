@@ -23,6 +23,7 @@ class LinuxTextInjector:
         if not text:
             return False
 
+        self._copy_to_clipboard(text)
         lines = text.split("\n")
         for index, line in enumerate(lines):
             if line:
@@ -30,6 +31,31 @@ class LinuxTextInjector:
             if index < len(lines) - 1:
                 self._press_enter()
         return True
+
+    def _copy_to_clipboard(self, text: str) -> None:
+        if os.getenv("WAYLAND_DISPLAY") and shutil.which("wl-copy"):
+            command = ["wl-copy"]
+        elif shutil.which("xclip"):
+            command = ["xclip", "-selection", "clipboard"]
+        elif shutil.which("xsel"):
+            command = ["xsel", "--clipboard", "--input"]
+        else:
+            raise TextInjectorError(
+                "Linux clipboard support requires wl-copy, xclip, or xsel."
+            )
+
+        try:
+            subprocess.run(
+                command,
+                input=text,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except subprocess.CalledProcessError as error:
+            message = error.stderr.strip() or str(error)
+            raise TextInjectorError(message) from error
 
     def _detect_backend(self) -> str:
         if os.getenv("WAYLAND_DISPLAY") and shutil.which("wtype"):

@@ -1,26 +1,16 @@
 from ..config import AppConfig
 from .base import SpeechProvider
+from .profile import ProviderField, ProviderProfile, provider_profile
 
 
 def build_speech_provider(config: AppConfig) -> SpeechProvider:
-    if config.normalized_provider == "gemini":
-        from .gemini_utterance import GeminiUtteranceProvider
-
-        return GeminiUtteranceProvider(config)
-    if config.normalized_provider == "openai":
-        from .openai_utterance import OpenAIUtteranceProvider
-
-        return OpenAIUtteranceProvider(config)
-    if config.normalized_provider == "ollama":
-        from .ollama_utterance import OllamaUtteranceProvider
-
-        return OllamaUtteranceProvider(config)
-    from .gcp_utterance import GcpUtteranceProvider
-
-    return GcpUtteranceProvider(config)
+    return provider_profile(config.normalized_provider).build(config)
 
 
 __all__ = [
     "SpeechProvider",
+    "ProviderField",
+    "ProviderProfile",
     "build_speech_provider",
+    "provider_profile",
 ]

@@ -10,6 +10,7 @@ from tkinter import messagebox, ttk
 from .config import AppConfig, LANGUAGE_OPTIONS, language_code_for_selection
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
+from .providers import provider_profile
 from .recognizer import ManualDictationSession
 from .recording_indicator import FloatingRecordingIndicator
 from .recording_meter import RecordingMeter
@@ -28,12 +29,17 @@ class DictationApp(tk.Tk):
 
         default_config = AppConfig.from_env()
         self._provider = default_config.normalized_provider
-        self.project_id_var = tk.StringVar(value=default_config.project_id)
+        self._provider_profile = provider_profile(self._provider)
+        self._provider_fields = self._provider_profile.fields(default_config)
+        self._provider_field_vars: dict[str, tk.StringVar] = {
+            field.key: tk.StringVar(value=field.value)
+            for field in self._provider_fields
+        }
         self.language_var = tk.StringVar(value=default_config.language_display_name)
-        self.model_var = tk.StringVar(value=default_config.resolved_model)
+        self.model_var = tk.StringVar(
+            value=default_config.model or self._provider_profile.default_model
+        )
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
-        self.location_var = tk.StringVar(value=default_config.recognizer_location)
-        self.ollama_base_url_var = tk.StringVar(value=default_config.ollama_base_url)
         self.status_var = tk.StringVar(value="Idle")
 
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
@@ -67,58 +73,27 @@ class DictationApp(tk.Tk):
         config_frame.columnconfigure(1, weight=1)
         row = 0
 
-        provider_name = {
-            "gemini": "Google Gemini",
-            "openai": "OpenAI",
-            "ollama": "Ollama",
-        }.get(self._provider, "Google Cloud")
         ttk.Label(config_frame, text="Provider").grid(
             row=row, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Label(config_frame, text=provider_name).grid(
+        ttk.Label(config_frame, text=self._provider_profile.display_name).grid(
             row=row, column=1, sticky="w", pady=(0, 8)
         )
         row += 1
 
-        if self._provider == "gemini":
-            ttk.Label(config_frame, text="API Key").grid(
+        for field in self._provider_fields:
+            ttk.Label(config_frame, text=field.label).grid(
                 row=row, column=0, sticky="w", pady=(0, 8)
             )
-            ttk.Label(config_frame, text="Loaded from GEMINI_API_KEY").grid(
-                row=row, column=1, sticky="w", pady=(0, 8)
-            )
-            row += 1
-        elif self._provider == "openai":
-            ttk.Label(config_frame, text="API Key").grid(
-                row=row, column=0, sticky="w", pady=(0, 8)
-            )
-            ttk.Label(config_frame, text="Loaded from OPENAI_API_KEY").grid(
-                row=row, column=1, sticky="w", pady=(0, 8)
-            )
-            row += 1
-        elif self._provider == "ollama":
-            ttk.Label(config_frame, text="Base URL").grid(
-                row=row, column=0, sticky="w", pady=(0, 8)
-            )
-            ttk.Label(config_frame, text="Loaded from OLLAMA_BASE_URL").grid(
-                row=row, column=1, sticky="w", pady=(0, 8)
-            )
-            row += 1
-        else:
-            ttk.Label(config_frame, text="Google Cloud Project ID").grid(
-                row=row, column=0, sticky="w", pady=(0, 8)
-            )
-            ttk.Entry(config_frame, textvariable=self.project_id_var).grid(
-                row=row, column=1, sticky="ew", pady=(0, 8)
-            )
-            row += 1
-
-            ttk.Label(config_frame, text="Location").grid(
-                row=row, column=0, sticky="w", pady=(0, 8)
-            )
-            ttk.Entry(config_frame, textvariable=self.location_var).grid(
-                row=row, column=1, sticky="ew", pady=(0, 8)
-            )
+            if field.editable:
+                ttk.Entry(
+                    config_frame,
+                    textvariable=self._provider_field_vars[field.key],
+                ).grid(row=row, column=1, sticky="ew", pady=(0, 8))
+            else:
+                ttk.Label(config_frame, text=f"Loaded from {field.source}").grid(
+                    row=row, column=1, sticky="w", pady=(0, 8)
+                )
             row += 1
 
         ttk.Label(config_frame, text="Language").grid(
@@ -219,44 +194,25 @@ class DictationApp(tk.Tk):
         if self._session is not None and (self._session.recording or self._session.transcribing):
             return
 
-        provider = self._provider
-        project_id = self.project_id_var.get().strip()
-        if provider == "gcp" and not project_id:
-            messagebox.showerror(
-                "Missing project ID",
-                "Enter a Google Cloud project ID or set GOOGLE_CLOUD_PROJECT for GCP mode.",
-            )
-            return
-        if provider == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
-            messagebox.showerror(
-                "Missing Gemini API key",
-                "Set GEMINI_API_KEY before starting Gemini mode.",
-            )
-            return
-        if provider == "openai" and not os.getenv("OPENAI_API_KEY", "").strip():
-            messagebox.showerror(
-                "Missing OpenAI API key",
-                "Set OPENAI_API_KEY before starting OpenAI mode.",
-            )
-            return
-        ollama_base_url = self.ollama_base_url_var.get().strip()
-        if provider == "ollama" and not ollama_base_url:
-            messagebox.showerror(
-                "Missing Ollama URL",
-                "Set OLLAMA_BASE_URL before starting Ollama mode.",
-            )
+        provider_values = {
+            key: value.get().strip()
+            for key, value in self._provider_field_vars.items()
+        }
+        validation_error = self._provider_profile.validate(provider_values)
+        if validation_error:
+            messagebox.showerror("Provider unavailable", validation_error)
             return
 
         config = AppConfig(
-            provider=provider,
-            project_id=project_id,
+            provider=self._provider,
+            project_id=provider_values.get("project_id", ""),
             language_code=language_code_for_selection(self.language_var.get()),
-            model=self.model_var.get().strip() or self._default_model_for_provider(provider),
+            model=self.model_var.get().strip() or self._provider_profile.default_model,
             hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
-            recognizer_location=self.location_var.get().strip() or "us",
-            gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
-            openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
-            ollama_base_url=ollama_base_url,
+            recognizer_location=provider_values.get("recognizer_location", "us") or "us",
+            gemini_api_key=provider_values.get("gemini_api_key", ""),
+            openai_api_key=provider_values.get("openai_api_key", ""),
+            ollama_base_url=provider_values.get("ollama_base_url", ""),
         )
 
         try:
@@ -308,7 +264,7 @@ class DictationApp(tk.Tk):
                     "Transcript copied to the clipboard.",
                     "Transcript pasted into the focused app and copied to the clipboard.",
                 } or payload.startswith("Error:") or payload.startswith(
-                    "Speech provider error:"
+                    "Transcription failed:"
                 ) or payload.startswith("Typing failed:"):
                     self._hide_recording_meter()
                     self.start_button.configure(state="normal")
@@ -348,14 +304,6 @@ class DictationApp(tk.Tk):
         if self._session is None or not self._session.recording:
             return
         self._session.restore_target_focus()
-
-    def _default_model_for_provider(self, provider: str) -> str:
-        return {
-            "gemini": "gemini-3.5-flash-lite",
-            "gcp": "chirp_3",
-            "openai": "gpt-4o-mini-transcribe",
-            "ollama": "gemma4:default",
-        }.get(provider, "gemini-3.5-flash-lite")
 
     def _start_hotkey_listener(self) -> None:
         hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY

@@ -25,6 +25,7 @@ This project is a small desktop app written in Python. It records your speech be
 - For Linux text injection:
   - `xdotool` on X11, or
   - `wtype` on Wayland
+- For Linux clipboard support: `xclip` or `xsel` on X11, or `wl-copy` on Wayland
 - For Linux audio capture with `sounddevice`: PortAudio must be installed at the system level
 - For macOS text injection: grant Accessibility access to your terminal app or Python app
 - For macOS global hotkeys: Accessibility access is also required

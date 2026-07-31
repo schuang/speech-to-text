@@ -102,6 +102,7 @@ class WindowsTextInjector:
         if not text:
             return False
 
+        self._set_clipboard_text(text)
         try:
             for character in text:
                 if character == "\n":
@@ -172,8 +173,6 @@ class WindowsTextInjector:
         self._send_inputs([key_down, key_up])
 
     def _paste_text(self, text: str) -> None:
-        self._set_clipboard_text(text)
-
         ctrl_down = INPUT(
             type=INPUT_KEYBOARD,
             ki=KEYBDINPUT(
