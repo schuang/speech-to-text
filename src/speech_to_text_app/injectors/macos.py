@@ -58,6 +58,35 @@ _TERMINAL_BUNDLE_IDS = {
     "com.apple.Terminal",
     "com.googlecode.iterm2",
 }
+_BROWSER_BUNDLE_IDS = {
+    "com.apple.safari",
+    "com.apple.safariservices",
+    "com.apple.safaritechnologypreview",
+    "com.brave.browser",
+    "com.duckduckgo.macos.browser",
+    "com.google.chrome",
+    "com.google.chrome.beta",
+    "com.google.chrome.canary",
+    "com.microsoft.edgemac",
+    "com.operasoftware.opera",
+    "com.vivaldi.vivaldi",
+    "company.thebrowser.browser",
+    "org.chromium.chromium",
+    "org.mozilla.firefox",
+}
+_BROWSER_APP_NAMES = {
+    "arc",
+    "brave browser",
+    "chromium",
+    "duckduckgo",
+    "firefox",
+    "google chrome",
+    "microsoft edge",
+    "opera",
+    "safari",
+    "safari technology preview",
+    "vivaldi",
+}
 _DEFAULT_PASTE_SHORTCUT = "command+v"
 _DEFAULT_REMOTE_PASTE_SHORTCUT = "ctrl+shift+v"
 _DEFAULT_REMOTE_PASTE_TARGETS = ("rustdesk",)
@@ -158,8 +187,10 @@ class MacOSTextInjector:
 
     def _should_use_ax_insertion(self, target: MacOSInjectionTarget) -> bool:
         bundle_id = (target.bundle_id or "").strip()
-        return bundle_id not in _TERMINAL_BUNDLE_IDS and not self._is_remote_paste_target(
-            target
+        return (
+            bundle_id not in _TERMINAL_BUNDLE_IDS
+            and not self._is_browser_target(target)
+            and not self._is_remote_paste_target(target)
         )
 
     def _require_tool(self, tool_name: str) -> None:
@@ -394,6 +425,14 @@ class MacOSTextInjector:
             for candidate in candidates
             if candidate
         )
+
+    def _is_browser_target(self, target: MacOSInjectionTarget) -> bool:
+        bundle_id = (target.bundle_id or "").strip().lower()
+        if bundle_id in _BROWSER_BUNDLE_IDS:
+            return True
+
+        app_name = (target.app_name or "").strip().lower()
+        return app_name in _BROWSER_APP_NAMES
 
     def _shortcut_to_applescript(self, shortcut: str) -> str:
         tokens = [token.strip().lower() for token in shortcut.split("+") if token.strip()]

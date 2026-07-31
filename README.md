@@ -355,6 +355,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The GUI language field is a dropdown with presets for English (United States) and Chinese (Mandarin, Taiwan). You can still type a locale manually if you need a different language code.
 - Windows text injection uses Unicode keyboard events.
 - On macOS, local apps default to `Command+V` for clipboard paste fallback.
+- On macOS, browser targets use clipboard paste so web text inputs receive the normal paste event.
 - On macOS, targets whose app name or bundle ID matches `DICTATION_MACOS_REMOTE_PASTE_TARGETS` default to `Ctrl+Shift+V` for clipboard paste fallback. This is intended for remote terminals shown through RustDesk.
 - Windows shows a small live recording meter while audio is being captured.
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.

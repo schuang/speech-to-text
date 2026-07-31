@@ -54,6 +54,38 @@ class MacOSTextInjectorTests(unittest.TestCase):
         insert_mock.assert_not_called()
         paste_mock.assert_called_once_with(None, shortcut="command+v")
 
+    def test_browser_target_skips_ax_insertion_and_uses_paste(self) -> None:
+        injector = MacOSTextInjector()
+        target = MacOSInjectionTarget(
+            app=None,
+            window=None,
+            element=object(),
+            bundle_id="com.google.Chrome",
+            app_name="Google Chrome",
+        )
+
+        with patch.object(injector, "_copy_to_clipboard") as copy_mock, patch.object(
+            injector,
+            "_restore_focus_target",
+        ) as restore_mock, patch.object(
+            injector,
+            "_insert_text_into_target",
+            return_value=True,
+        ) as insert_mock, patch.object(
+            injector,
+            "_frontmost_bundle_id",
+            return_value="com.google.Chrome",
+        ), patch.object(
+            injector,
+            "_paste_clipboard",
+        ) as paste_mock:
+            injector.type_text("hello browser", target=target)
+
+        copy_mock.assert_called_once_with("hello browser")
+        restore_mock.assert_called_once_with(target)
+        insert_mock.assert_not_called()
+        paste_mock.assert_called_once_with(None, shortcut="command+v")
+
     def test_rustdesk_target_uses_remote_paste_shortcut(self) -> None:
         injector = MacOSTextInjector()
         target = MacOSInjectionTarget(

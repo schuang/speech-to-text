@@ -77,15 +77,13 @@ The paste shortcut is configurable because the correct shortcut depends on the t
 
 ## Browser targets
 
-Browser targets usually expose an Accessibility-backed editable element inside a larger browser process.
-
-From the injector's point of view, browsers are still "normal editable controls" as long as the exact focused element is preserved. That is why the macOS path captures the focused UI element instead of relying only on the app identity.
+Browser targets usually expose editable web content inside a larger browser process. Some browsers report successful Accessibility text updates even when the page input is not actually changed, and direct value mutation can also bypass normal web input events.
 
 For browser text fields, the preferred behavior is:
 
-- restore the exact focused element
-- attempt Accessibility insertion first
-- use clipboard paste only if the editable Accessibility path is not available
+- restore the browser target
+- copy the transcript to the clipboard
+- send the normal macOS paste shortcut
 
 ## Word-style editable applications
 
@@ -152,8 +150,8 @@ In practical terms, the macOS flow is:
 ### Browser text field
 
 - Target model: editable Accessibility control inside a browser process
-- Preferred insertion path: direct Accessibility insertion
-- Fallback: clipboard paste
+- Preferred insertion path: clipboard paste
+- Accessibility insertion: skipped because browser AX updates can silently no-op or bypass page input events
 
 ### Word-style app
 
