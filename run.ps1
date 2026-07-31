@@ -3,12 +3,30 @@ param(
     [string]$ProjectId = "",
     [string]$Location = "us",
     [switch]$SmokeTest,
+    [Alias("h", "-help")]
+    [switch]$Help,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AppArguments = @()
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ($Help -or $AppArguments -contains "--help" -or $AppArguments -contains "-h") {
+    @"
+Usage: .\run.ps1 [options]
+
+Starts the speech-to-text app with the local provider by default.
+
+Options:
+  -Provider <local|gcp|openai>  Override the transcription provider.
+  -ProjectId <project-id>       Set the Google Cloud project for GCP mode.
+  -Location <location>          Set the GCP location (default: us).
+  -SmokeTest                    Validate setup without opening the app.
+  -Help, -h, --help             Show this usage information and exit.
+"@
+    exit 0
+}
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $venvRoot = Join-Path $scriptRoot ".venv"
@@ -80,17 +98,8 @@ if ($createdVenv -or -not $packageInstalled) {
     & $venvPython -m pip install -e $scriptRoot
 }
 
-if ($AppArguments -contains "--help" -or $AppArguments -contains "-h") {
-    & $venvPython -m speech_to_text_app @AppArguments
-    exit $LASTEXITCODE
-}
-
 if (-not $Provider) {
-    $Provider = $env:SPEECH_PROVIDER
-}
-
-if (-not $Provider) {
-    $Provider = "gcp"
+    $Provider = "local"
 }
 
 $env:SPEECH_PROVIDER = $Provider

@@ -98,7 +98,7 @@ uv sync
 
    On macOS, install Tkinter and audio dependencies through your Python distribution as needed, then grant Accessibility access before testing text injection.
 
-5. Configure the provider you want to use. Google Cloud Speech-to-Text is the default:
+5. Configure the provider you want to use. The launcher scripts default to local Faster Whisper:
 
    ```powershell
    gcloud auth application-default login
@@ -112,15 +112,15 @@ uv sync
 
 6. Set your provider-specific environment.
 
-   Provider detection works like this:
+   Launcher provider selection works like this:
 
-   - If `SPEECH_PROVIDER` is set to `gcp`, `openai`, or `local`, the app uses that value.
-   - Otherwise, the app uses Google Cloud Speech-to-Text.
+   - `run.sh`, `run.ps1`, and `run.cmd` use local Faster Whisper by default.
+   - Use `--provider` with `run.sh` or `-Provider` with the Windows launchers to select GCP or OpenAI.
+   - Direct `python -m speech_to_text_app` launches still read `SPEECH_PROVIDER` and default to GCP when it is unset.
 
    For Google Cloud Speech-to-Text:
 
    ```powershell
-   $env:SPEECH_PROVIDER="gcp"
    $env:GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
    ```
 
@@ -147,7 +147,6 @@ uv sync
    For OpenAI:
 
    ```powershell
-   $env:SPEECH_PROVIDER="openai"
    $env:OPENAI_API_KEY="your-openai-api-key"
    ```
 
@@ -182,10 +181,9 @@ The PowerShell launcher creates `.venv` when needed and installs the dependencie
 run.cmd -Provider local
 ```
 
-You can also configure local mode through environment variables:
+You can also configure the local model through environment variables:
 
 ```powershell
-$env:SPEECH_PROVIDER="local"
 $env:SPEECH_MODEL="base.en"
 $env:LOCAL_WHISPER_DEVICE="cpu"
 $env:LOCAL_WHISPER_COMPUTE_TYPE="int8"
@@ -211,7 +209,6 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e .
 
-export SPEECH_PROVIDER="local"
 export SPEECH_MODEL="base.en"
 export LOCAL_WHISPER_DEVICE="cpu"
 export LOCAL_WHISPER_COMPUTE_TYPE="int8"
@@ -232,7 +229,6 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e .
 
-export SPEECH_PROVIDER="local"
 export SPEECH_MODEL="base.en"
 export LOCAL_WHISPER_DEVICE="cpu"
 export LOCAL_WHISPER_COMPUTE_TYPE="int8"
@@ -281,7 +277,6 @@ Mandarin requires a multilingual model. Do not use `base.en` or another model en
 On Windows PowerShell, start local mode with the multilingual `base` model:
 
 ```powershell
-$env:SPEECH_PROVIDER="local"
 $env:SPEECH_MODEL="base"
 $env:LOCAL_WHISPER_DEVICE="cpu"
 $env:LOCAL_WHISPER_COMPUTE_TYPE="int8"
@@ -291,7 +286,6 @@ $env:LOCAL_WHISPER_COMPUTE_TYPE="int8"
 On Linux or macOS:
 
 ```bash
-export SPEECH_PROVIDER="local"
 export SPEECH_MODEL="base"
 export LOCAL_WHISPER_DEVICE="cpu"
 export LOCAL_WHISPER_COMPUTE_TYPE="int8"
@@ -332,46 +326,42 @@ uv run python -m speech_to_text_app
 Windows:
 
 ```powershell
-$env:SPEECH_PROVIDER="gcp"
 $env:GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-.\run.ps1
+.\run.ps1 -Provider gcp
 ```
 
 Windows Command Prompt:
 
 ```bat
-set SPEECH_PROVIDER=gcp
 set GOOGLE_CLOUD_PROJECT=your-gcp-project-id
-run.cmd
+run.cmd -Provider gcp
 ```
 
 Linux:
 
 ```bash
-export SPEECH_PROVIDER="gcp"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-./run.sh
+./run.sh --provider gcp
 ```
 
 macOS:
 
 ```bash
-export SPEECH_PROVIDER="gcp"
 export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-./run.sh
+./run.sh --provider gcp
 ```
 
 You can also set the location if you want to override the default `us` region:
 
 ```powershell
 $env:GOOGLE_CLOUD_LOCATION="us"
-.\run.ps1
+.\run.ps1 -Provider gcp
 ```
 
 If you prefer not to set environment variables, you can pass the project directly on Windows:
 
 ```powershell
-.\run.ps1 -ProjectId your-gcp-project-id
+.\run.ps1 -Provider gcp -ProjectId your-gcp-project-id
 ```
 
 Show the detailed recording workflow without opening the graphical UI:
@@ -385,46 +375,42 @@ On Linux or macOS, use `./run.sh --help`.
 OpenAI example:
 
 ```powershell
-$env:SPEECH_PROVIDER="openai"
 $env:OPENAI_API_KEY="your-openai-api-key"
-.\run.ps1
+.\run.ps1 -Provider openai
 ```
 
 OpenAI from Windows Command Prompt:
 
 ```bat
-set SPEECH_PROVIDER=openai
 set OPENAI_API_KEY=your-openai-api-key
-run.cmd
+run.cmd -Provider openai
 ```
 
 Linux OpenAI example:
 
 ```bash
-export SPEECH_PROVIDER="openai"
 export OPENAI_API_KEY="your-openai-api-key"
-./run.sh
+./run.sh --provider openai
 ```
 
 macOS OpenAI example:
 
 ```bash
-export SPEECH_PROVIDER="openai"
 export OPENAI_API_KEY="your-openai-api-key"
-./run.sh
+./run.sh --provider openai
 ```
 
 OpenAI on Linux or macOS:
 
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
-./run.sh
+./run.sh --provider openai
 ```
 
 Optional location override:
 
 ```powershell
-.\run.ps1 -Location us
+.\run.ps1 -Provider gcp -Location us
 ```
 
 Windows smoke test without opening the UI:
@@ -448,8 +434,8 @@ The app only injects finalized transcription results. It does not auto-stop on s
 
 ## Notes
 
-- The default provider is `gcp`.
-- Provider selection comes from `SPEECH_PROVIDER` when set; otherwise the app uses Google Cloud Speech-to-Text.
+- The launcher scripts default to the local provider; use their provider option to select GCP or OpenAI.
+- Direct module launches read `SPEECH_PROVIDER` when set and otherwise use Google Cloud Speech-to-Text.
 - The UI no longer exposes provider editing. It shows only the fields relevant to the detected provider.
 - When OpenAI is active, the UI hides Google Cloud project and location fields.
 - When Google Cloud is active, the UI hides OpenAI-specific status rows.
