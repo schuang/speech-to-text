@@ -251,6 +251,7 @@ class DictationApp(tk.Tk):
         self.microphone_var.set(self._session.microphone_name)
 
         if self._session.recording:
+            self._clear_final_text()
             self._show_recording_meter()
             self.after(75, self._restore_recording_target)
 
@@ -333,6 +334,11 @@ class DictationApp(tk.Tk):
         self.final_text.configure(state="normal")
         self.final_text.insert("end", f"{text}\n")
         self.final_text.see("end")
+        self.final_text.configure(state="disabled")
+
+    def _clear_final_text(self) -> None:
+        self.final_text.configure(state="normal")
+        self.final_text.delete("1.0", "end")
         self.final_text.configure(state="disabled")
 
     def _toggle_recording(self) -> None:
