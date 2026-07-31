@@ -2,7 +2,9 @@ param(
     [string]$Provider = "",
     [string]$ProjectId = "",
     [string]$Location = "us",
-    [switch]$SmokeTest
+    [switch]$SmokeTest,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$AppArguments = @()
 )
 
 Set-StrictMode -Version Latest
@@ -78,6 +80,11 @@ if ($createdVenv -or -not $packageInstalled) {
     & $venvPython -m pip install -e $scriptRoot
 }
 
+if ($AppArguments -contains "--help" -or $AppArguments -contains "-h") {
+    & $venvPython -m speech_to_text_app @AppArguments
+    exit $LASTEXITCODE
+}
+
 if (-not $Provider) {
     $Provider = $env:SPEECH_PROVIDER
 }
@@ -121,4 +128,4 @@ if ($Provider -eq "gcp" -and -not $ProjectId) {
 
 $env:GOOGLE_CLOUD_PROJECT = $ProjectId
 $env:GOOGLE_CLOUD_LOCATION = $Location
-& $venvPython -m speech_to_text_app
+& $venvPython -m speech_to_text_app @AppArguments

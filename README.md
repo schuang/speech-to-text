@@ -216,6 +216,14 @@ If you prefer not to set environment variables, you can pass the project directl
 .\run.ps1 -ProjectId your-gcp-project-id
 ```
 
+Show the detailed recording workflow without opening the graphical UI:
+
+```powershell
+.\run.ps1 --help
+```
+
+On Linux or macOS, use `./run.sh --help`.
+
 OpenAI example:
 
 ```powershell

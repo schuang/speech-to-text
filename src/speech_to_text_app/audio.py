@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
+from .microphones import input_device_name
+
 try:
     import sounddevice as sd
 except ImportError:
@@ -56,6 +58,7 @@ class ManualAudioRecorder:
         self._stream: sd.RawInputStream | None = None
         self._closed = True
         self._buffer = bytearray()
+        self.microphone_name = input_device_name()
 
     @property
     def recording(self) -> bool:
@@ -74,6 +77,9 @@ class ManualAudioRecorder:
                 channels=1,
                 dtype="int16",
                 callback=self._audio_callback,
+            )
+            self.microphone_name = input_device_name(
+                getattr(self._stream, "device", None)
             )
             self._stream.start()
         except sd.PortAudioError as error:

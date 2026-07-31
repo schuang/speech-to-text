@@ -10,6 +10,11 @@ fi
 
 source .venv/bin/activate
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  python -m speech_to_text_app "$@"
+  exit $?
+fi
+
 provider="${SPEECH_PROVIDER:-gcp}"
 export SPEECH_PROVIDER="$provider"
 
@@ -25,4 +30,4 @@ EOF
   exit 1
 fi
 
-python -m speech_to_text_app
+python -m speech_to_text_app "$@"

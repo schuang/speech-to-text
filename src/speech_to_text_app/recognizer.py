@@ -7,6 +7,7 @@ from collections.abc import Callable
 from .audio import AudioRecorderError, ManualAudioRecorder
 from .config import AppConfig
 from .injectors import TextInjector, TextInjectorError
+from .microphones import input_device_name
 from .providers import SpeechProvider, build_speech_provider
 
 
@@ -46,6 +47,12 @@ class ManualDictationSession:
     @property
     def transcribing(self) -> bool:
         return self._transcription_thread is not None and self._transcription_thread.is_alive()
+
+    @property
+    def microphone_name(self) -> str:
+        if self._recorder is not None:
+            return self._recorder.microphone_name
+        return input_device_name()
 
     def start_recording(self) -> None:
         if self.recording or self.transcribing:

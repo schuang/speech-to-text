@@ -10,6 +10,7 @@ from tkinter import messagebox, ttk
 from .config import AppConfig, LANGUAGE_OPTIONS, language_code_for_selection
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
+from .microphones import input_device_name
 from .providers import provider_profile
 from .recognizer import ManualDictationSession
 from .recording_indicator import FloatingRecordingIndicator
@@ -23,7 +24,7 @@ class DictationApp(tk.Tk):
         super().__init__()
         self.title("Speech To Text Dictation")
         self.geometry("460x560")
-        self.minsize(430, 500)
+        self.minsize(430, 420)
         self._icon_image: tk.PhotoImage | None = None
         self._set_window_icon()
 
@@ -40,6 +41,7 @@ class DictationApp(tk.Tk):
             value=default_config.model or self._provider_profile.default_model
         )
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
+        self.microphone_var = tk.StringVar(value=input_device_name())
         self.status_var = tk.StringVar(value="Idle")
 
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
@@ -79,6 +81,16 @@ class DictationApp(tk.Tk):
         ttk.Label(config_frame, text=self._provider_profile.display_name).grid(
             row=row, column=1, sticky="w", pady=(0, 8)
         )
+        row += 1
+
+        ttk.Label(config_frame, text="Microphone").grid(
+            row=row, column=0, sticky="w", pady=(0, 8)
+        )
+        ttk.Label(
+            config_frame,
+            textvariable=self.microphone_var,
+            wraplength=300,
+        ).grid(row=row, column=1, columnspan=2, sticky="w", pady=(0, 8))
         row += 1
 
         for field in self._provider_fields:
@@ -157,31 +169,12 @@ class DictationApp(tk.Tk):
         content = ttk.Frame(self, padding=(16, 0, 16, 16))
         content.grid(row=1, column=0, sticky="nsew")
         content.columnconfigure(0, weight=1)
-        content.rowconfigure(3, weight=1)
-
-        ttk.Label(
-            content,
-            text=(
-                "Usage: click Start Recording, speak your full prompt or paragraph, "
-                "then click Stop And Transcribe. The default hotkey is "
-                "ctrl+shift+space on macOS and ctrl+alt+space on Windows. Press the hotkey once to start "
-                "recording and press it again to stop, transcribe, paste into the "
-                "focused app, and copy the transcript to the clipboard. The manual "
-                "buttons remain as a fallback."
-            ),
-            wraplength=400,
-            justify="left",
-        ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
-
-        ttk.Label(content, text="Status").grid(row=1, column=0, sticky="w")
-        ttk.Label(content, textvariable=self.status_var).grid(
-            row=2, column=0, sticky="w", pady=(0, 12)
-        )
+        content.rowconfigure(0, weight=1)
 
         transcript_frame = ttk.LabelFrame(content, text="Captured Transcript")
-        transcript_frame.grid(row=3, column=0, sticky="nsew")
+        transcript_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 12))
         transcript_frame.columnconfigure(0, weight=1)
-        transcript_frame.rowconfigure(0, weight=1)
+        transcript_frame.rowconfigure(1, weight=1)
 
         ttk.Label(transcript_frame, text="Final Text Sent").grid(
             row=0, column=0, sticky="w", padx=12, pady=(12, 4)
@@ -189,6 +182,11 @@ class DictationApp(tk.Tk):
         self.final_text = tk.Text(transcript_frame, height=10, wrap="word")
         self.final_text.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self.final_text.configure(state="disabled")
+
+        ttk.Label(content, text="Status").grid(row=1, column=0, sticky="w")
+        ttk.Label(content, textvariable=self.status_var).grid(
+            row=2, column=0, sticky="w"
+        )
 
     def _start_session(self) -> None:
         if self._session is not None and (self._session.recording or self._session.transcribing):
@@ -227,6 +225,7 @@ class DictationApp(tk.Tk):
             on_level=lambda level: self._events.put(("level", level)),
         )
         self._session.start_recording()
+        self.microphone_var.set(self._session.microphone_name)
 
         if self._session.recording:
             self._show_recording_meter()
