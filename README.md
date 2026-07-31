@@ -8,7 +8,7 @@ This project is a small desktop app written in Python. It records your speech be
 - Uses explicit manual start/stop recording instead of silence-based auto-stop.
 - Supports global hotkeys on macOS and Windows.
 - Shows a small Windows recording meter while audio is being captured.
-- Supports Google Gemini, Google Cloud Speech-to-Text V2, OpenAI transcription models, and Ollama-hosted Gemma 4 transcription.
+- Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
 - Detects the active provider from your environment.
 - Shows finalized transcripts in a local control window.
 - Pastes final transcript text into the active application, such as a terminal, VS Code, LibreOffice, Word, or a browser text field.
@@ -18,10 +18,8 @@ This project is a small desktop app written in Python. It records your speech be
 
 - Windows, Linux, or macOS
 - `uv`, or Python 3.11+ installed and available on `PATH`
-- For the default Gemini mode: a `GEMINI_API_KEY`
-- For GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
+- For the default GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
 - For OpenAI mode: an `OPENAI_API_KEY`
-- For Ollama mode: an `OLLAMA_BASE_URL` that points to a reachable Ollama server
 - For Linux text injection:
   - `xdotool` on X11, or
   - `wtype` on Wayland
@@ -99,13 +97,7 @@ uv sync
 
    On macOS, install Tkinter and audio dependencies through your Python distribution as needed, then grant Accessibility access before testing text injection.
 
-5. Configure the provider you want to use. Gemini is the default:
-
-   ```powershell
-   $env:GEMINI_API_KEY="your-gemini-api-key"
-   ```
-
-   For Google Cloud Speech-to-Text instead:
+5. Configure the provider you want to use. Google Cloud Speech-to-Text is the default:
 
    ```powershell
    gcloud auth application-default login
@@ -121,21 +113,8 @@ uv sync
 
    Provider detection works like this:
 
-   - If `SPEECH_PROVIDER` is set to `gemini`, `gcp`, `openai`, or `ollama`, the app uses that value.
-   - Otherwise, the app uses Gemini, regardless of which provider credentials are present.
-   - Set `GEMINI_API_KEY` before transcribing with the default provider.
-
-   For Gemini:
-
-   ```powershell
-   $env:GEMINI_API_KEY="your-gemini-api-key"
-   ```
-
-   Optional: override the default `gemini-3.5-flash-lite` model:
-
-   ```powershell
-   $env:SPEECH_MODEL="another-gemini-model"
-   ```
+   - If `SPEECH_PROVIDER` is set to `gcp` or `openai`, the app uses that value.
+   - Otherwise, the app uses Google Cloud Speech-to-Text.
 
    For Google Cloud Speech-to-Text:
 
@@ -171,14 +150,6 @@ uv sync
    $env:OPENAI_API_KEY="your-openai-api-key"
    ```
 
-   For Ollama:
-
-   ```powershell
-   $env:SPEECH_PROVIDER="ollama"
-   $env:OLLAMA_BASE_URL="http://your-ollama-host:11434"
-   $env:OLLAMA_MODEL="gemma4:default"
-   ```
-
 ## Run
 
 Set your provider environment in the current shell, then start the app.
@@ -187,7 +158,7 @@ Windows Command Prompt with `uv`:
 
 ```cmd
 cd %USERPROFILE%\Documents\speech-to-text
-set GEMINI_API_KEY=your-gemini-api-key
+set GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 uv run python -m speech_to_text_app
 ```
 
@@ -197,16 +168,6 @@ OpenAI from Windows Command Prompt with `uv`:
 cd %USERPROFILE%\Documents\speech-to-text
 set SPEECH_PROVIDER=openai
 set OPENAI_API_KEY=your-openai-api-key
-uv run python -m speech_to_text_app
-```
-
-Ollama from Windows Command Prompt with `uv`:
-
-```cmd
-cd %USERPROFILE%\Documents\speech-to-text
-set SPEECH_PROVIDER=ollama
-set OLLAMA_BASE_URL=http://your-ollama-host:11434
-set OLLAMA_MODEL=gemma4:default
 uv run python -m speech_to_text_app
 ```
 
@@ -271,15 +232,6 @@ set OPENAI_API_KEY=your-openai-api-key
 run.cmd
 ```
 
-Ollama example:
-
-```powershell
-$env:SPEECH_PROVIDER="ollama"
-$env:OLLAMA_BASE_URL="http://your-ollama-host:11434"
-$env:OLLAMA_MODEL="gemma4:default"
-.\run.ps1
-```
-
 Linux OpenAI example:
 
 ```bash
@@ -296,19 +248,10 @@ export OPENAI_API_KEY="your-openai-api-key"
 ./run.sh
 ```
 
-OpenAI with provider auto-detection:
+OpenAI on Linux or macOS:
 
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
-./run.sh
-```
-
-Linux Ollama example:
-
-```bash
-export SPEECH_PROVIDER="ollama"
-export OLLAMA_BASE_URL="http://your-ollama-host:11434"
-export OLLAMA_MODEL="gemma4:default"
 ./run.sh
 ```
 
@@ -328,30 +271,24 @@ Windows smoke test without opening the UI:
 
 1. Launch the app.
 2. Confirm the detected provider, then review the fields shown for that provider.
-3. If the app is using Gemini, confirm that `GEMINI_API_KEY` is set in your shell.
-4. If the app is using Google Cloud, confirm the project ID and location.
-5. If the app is using OpenAI, confirm that `OPENAI_API_KEY` is set in your shell.
-6. If the app is using Ollama, confirm that `OLLAMA_BASE_URL` is set in your shell and the model field matches the server model name.
-7. Click into the target app where text should appear.
-8. Click `Start Recording` or use the global hotkey where supported.
-9. Speak your full prompt, including long pauses if needed.
-10. Click `Stop And Transcribe`, or press the hotkey again to stop recording, transcribe, and paste into the currently focused app.
+3. If the app is using Google Cloud, confirm the project ID and location.
+4. If the app is using OpenAI, confirm that `OPENAI_API_KEY` is set in your shell.
+5. Click into the target app where text should appear.
+6. Click `Start Recording` or use the global hotkey where supported.
+7. Speak your full prompt, including long pauses if needed.
+8. Click `Stop And Transcribe`, or press the hotkey again to stop recording, transcribe, and paste into the currently focused app.
 
 The app only injects finalized transcription results. It does not auto-stop on silence. Finalized text is also copied to the clipboard.
 
 ## Notes
 
-- The default provider is `gemini`.
-- Provider selection comes from `SPEECH_PROVIDER` when set; otherwise the app always uses Gemini.
+- The default provider is `gcp`.
+- Provider selection comes from `SPEECH_PROVIDER` when set; otherwise the app uses Google Cloud Speech-to-Text.
 - The UI no longer exposes provider editing. It shows only the fields relevant to the detected provider.
 - When OpenAI is active, the UI hides Google Cloud project and location fields.
-- When Gemini is active, the UI loads its API key from `GEMINI_API_KEY`.
-- When Ollama is active, the UI expects `OLLAMA_BASE_URL` from the environment and uses the model field for the Ollama model name.
 - When Google Cloud is active, the UI hides OpenAI-specific status rows.
-- The default Gemini model is `gemini-3.5-flash-lite`.
 - The default GCP model is `chirp_3`.
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
-- The default Ollama model is `gemma4:default`, but `OLLAMA_MODEL` overrides it.
 - The default GCP location is `us`.
 - The GUI language field is a dropdown with presets for English (United States) and Chinese (Mandarin, Taiwan). You can still type a locale manually if you need a different language code.
 - Windows text injection uses Unicode keyboard events.
@@ -367,9 +304,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The macOS default uses modifiers specifically to avoid common browser `F6` focus shortcuts that jump to the address bar.
 - Global hotkeys are currently supported on Windows and macOS. Linux can still use the UI buttons for manual start/stop.
 - The GCP backend transcribes one recorded utterance at a time.
-- The Gemini backend uploads one recorded WAV utterance and emits finalized transcripts only.
 - The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
-- The Ollama backend uploads one recorded WAV utterance to the configured `OLLAMA_BASE_URL` and emits finalized transcripts only.
 
 ## Project Layout
 

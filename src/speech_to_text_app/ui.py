@@ -210,9 +210,7 @@ class DictationApp(tk.Tk):
             model=self.model_var.get().strip() or self._provider_profile.default_model,
             hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
             recognizer_location=provider_values.get("recognizer_location", "us") or "us",
-            gemini_api_key=provider_values.get("gemini_api_key", ""),
             openai_api_key=provider_values.get("openai_api_key", ""),
-            ollama_base_url=provider_values.get("ollama_base_url", ""),
         )
 
         try:

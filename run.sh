@@ -10,20 +10,8 @@ fi
 
 source .venv/bin/activate
 
-provider="${SPEECH_PROVIDER:-gemini}"
+provider="${SPEECH_PROVIDER:-gcp}"
 export SPEECH_PROVIDER="$provider"
-
-if [[ "$provider" == "gemini" && -z "${GEMINI_API_KEY:-}" ]]; then
-  cat >&2 <<'EOF'
-GEMINI_API_KEY is required for Gemini mode, for example:
-
-export GEMINI_API_KEY="your-gemini-api-key"
-./run.sh
-
-Set SPEECH_PROVIDER=gcp, openai, or ollama to use another provider.
-EOF
-  exit 1
-fi
 
 if [[ "$provider" == "gcp" && -z "${GOOGLE_CLOUD_PROJECT:-}" ]]; then
   cat >&2 <<'EOF'
@@ -33,18 +21,6 @@ export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 ./run.sh
 
 Or set SPEECH_PROVIDER=openai and OPENAI_API_KEY for OpenAI mode.
-EOF
-  exit 1
-fi
-
-if [[ "$provider" == "ollama" && -z "${OLLAMA_BASE_URL:-}" ]]; then
-  cat >&2 <<'EOF'
-OLLAMA_BASE_URL is required for Ollama mode, for example:
-
-export SPEECH_PROVIDER="ollama"
-export OLLAMA_BASE_URL="http://your-ollama-host:11434"
-export OLLAMA_MODEL="gemma4:default"
-./run.sh
 EOF
   exit 1
 fi

@@ -5,5 +5,5 @@ This context records spoken utterances and commits their finalized transcripts t
 ## Language
 
 **Transcription Provider**:
-The selected source that converts a captured utterance into its finalized transcript. Gemini, OpenAI, Google Cloud Speech-to-Text, and Ollama are Transcription Providers.
+The selected source that converts a captured utterance into its finalized transcript. Google Cloud Speech-to-Text and OpenAI are Transcription Providers.
 _Avoid_: Backend, engine

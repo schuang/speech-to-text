@@ -5,11 +5,6 @@ import sys
 from dataclasses import dataclass
 
 
-_DEFAULT_OLLAMA_BASE_URL = ""
-_DEFAULT_OLLAMA_MODEL = "gemma4:default"
-_DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
-
-
 @dataclass(frozen=True)
 class LanguageOption:
     label: str
@@ -73,24 +68,21 @@ def _default_hotkey() -> str:
 
 def _resolve_provider_from_env() -> str:
     explicit_provider = os.getenv("SPEECH_PROVIDER", "").strip().lower()
-    if explicit_provider in {"gemini", "gcp", "openai", "ollama"}:
+    if explicit_provider in {"gcp", "openai"}:
         return explicit_provider
-    return "gemini"
+    return "gcp"
 
 
 @dataclass(frozen=True)
 class AppConfig:
-    provider: str = "gemini"
+    provider: str = "gcp"
     project_id: str = ""
     language_code: str = "en-US"
-    model: str = _DEFAULT_GEMINI_MODEL
+    model: str = "chirp_3"
     hotkey: str = _default_hotkey()
     recognizer_location: str = "us"
     recognizer_id: str = "_"
-    gemini_api_key: str = ""
     openai_api_key: str = ""
-    ollama_base_url: str = _DEFAULT_OLLAMA_BASE_URL
-    ollama_timeout_seconds: float = 60.0
     sample_rate_hz: int = 16_000
     chunk_ms: int = 100
     append_trailing_space: bool = True
@@ -99,9 +91,9 @@ class AppConfig:
     @property
     def normalized_provider(self) -> str:
         provider = self.provider.strip().lower()
-        if provider in {"gemini", "gcp", "openai", "ollama"}:
+        if provider in {"gcp", "openai"}:
             return provider
-        return "gemini"
+        return "gcp"
 
     @property
     def recognizer_path(self) -> str:
@@ -122,11 +114,9 @@ class AppConfig:
             return self.model
         if self.normalized_provider == "openai":
             return "gpt-4o-mini-transcribe"
-        if self.normalized_provider == "ollama":
-            return _DEFAULT_OLLAMA_MODEL
         if self.normalized_provider == "gcp":
             return "chirp_3"
-        return _DEFAULT_GEMINI_MODEL
+        return "chirp_3"
 
     @property
     def openai_language(self) -> str:
@@ -139,18 +129,6 @@ class AppConfig:
     def language_display_name(self) -> str:
         return language_label_for_code(self.language_code)
 
-    @property
-    def ollama_chat_url(self) -> str:
-        base_url = self.ollama_base_url.strip() or _DEFAULT_OLLAMA_BASE_URL
-        if not base_url:
-            return ""
-        trimmed = base_url.rstrip("/")
-        if trimmed.endswith("/api/chat"):
-            return trimmed
-        if trimmed.endswith("/api"):
-            return f"{trimmed}/chat"
-        return f"{trimmed}/api/chat"
-
     @classmethod
     def from_env(cls) -> "AppConfig":
         provider = _resolve_provider_from_env()
@@ -158,20 +136,11 @@ class AppConfig:
         default_hotkey = _default_hotkey()
         hotkey = os.getenv("DICTATION_HOTKEY", default_hotkey).strip() or default_hotkey
         recognizer_location = os.getenv("GOOGLE_CLOUD_LOCATION", "us").strip() or "us"
-        gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
         openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        ollama_base_url = (
-            os.getenv("OLLAMA_BASE_URL", "").strip()
-            or os.getenv("OLLAMA_HOST", "").strip()
-        )
         configured_model = os.getenv("SPEECH_MODEL", "").strip()
-        if provider == "ollama" and not configured_model:
-            configured_model = os.getenv("OLLAMA_MODEL", "").strip()
         default_model = {
-            "gemini": _DEFAULT_GEMINI_MODEL,
             "gcp": "chirp_3",
             "openai": "gpt-4o-mini-transcribe",
-            "ollama": _DEFAULT_OLLAMA_MODEL,
         }[provider]
         return cls(
             provider=provider,
@@ -179,7 +148,5 @@ class AppConfig:
             model=configured_model or default_model,
             hotkey=hotkey,
             recognizer_location=recognizer_location,
-            gemini_api_key=gemini_api_key,
             openai_api_key=openai_api_key,
-            ollama_base_url=ollama_base_url,
         )

@@ -83,7 +83,7 @@ if (-not $Provider) {
 }
 
 if (-not $Provider) {
-    $Provider = "gemini"
+    $Provider = "gcp"
 }
 
 $env:SPEECH_PROVIDER = $Provider
@@ -101,18 +101,8 @@ if ($SmokeTest) {
     Write-Output ("SPEECH_PROVIDER=" + $env:SPEECH_PROVIDER)
     Write-Output ("GOOGLE_CLOUD_PROJECT=" + $env:GOOGLE_CLOUD_PROJECT)
     Write-Output ("GOOGLE_CLOUD_LOCATION=" + $env:GOOGLE_CLOUD_LOCATION)
-    Write-Output ("OLLAMA_BASE_URL=" + $env:OLLAMA_BASE_URL)
-    Write-Output ("OLLAMA_MODEL=" + $env:OLLAMA_MODEL)
     & $venvPython -c "import sys; import speech_to_text_app; print(sys.executable)"
     exit $LASTEXITCODE
-}
-
-if ($Provider -eq "gemini" -and -not $env:GEMINI_API_KEY) {
-    throw (
-        "GEMINI_API_KEY is required for Gemini mode. Set it first, for example:`n`n" +
-        '$env:GEMINI_API_KEY="your-gemini-api-key"' +
-        "`n.\\run.ps1"
-    )
 }
 
 if ($Provider -eq "gcp" -and -not $ProjectId) {
@@ -126,18 +116,6 @@ if ($Provider -eq "gcp" -and -not $ProjectId) {
         "`n.\\run.ps1`n`n" +
         "Or run with an explicit override:`n`n" +
         ".\\run.ps1 -ProjectId your-gcp-project-id"
-    )
-}
-
-if ($Provider -eq "ollama" -and -not $env:OLLAMA_BASE_URL) {
-    throw (
-        "OLLAMA_BASE_URL is required for Ollama mode. Set it first, for example:`n`n" +
-        '$env:SPEECH_PROVIDER="ollama"' +
-        "`n" +
-        '$env:OLLAMA_BASE_URL="http://your-ollama-host:11434"' +
-        "`n" +
-        '$env:OLLAMA_MODEL="gemma4:default"' +
-        "`n.\\run.ps1"
     )
 }
 
