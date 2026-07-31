@@ -62,6 +62,17 @@ def _gcp_fields(config: AppConfig) -> tuple[ProviderField, ...]:
     )
 
 
+def _local_fields(config: AppConfig) -> tuple[ProviderField, ...]:
+    return (
+        ProviderField("local_device", "Device", config.local_device),
+        ProviderField(
+            "local_compute_type",
+            "Compute Type",
+            config.local_compute_type,
+        ),
+    )
+
+
 def _build_openai(config: AppConfig) -> SpeechProvider:
     from .openai_utterance import OpenAIUtteranceProvider
 
@@ -74,9 +85,16 @@ def _build_gcp(config: AppConfig) -> SpeechProvider:
     return GcpUtteranceProvider(config)
 
 
+def _build_local(config: AppConfig) -> SpeechProvider:
+    from .faster_whisper_utterance import FasterWhisperUtteranceProvider
+
+    return FasterWhisperUtteranceProvider(config)
+
+
 _PROFILES = {
     "openai": ProviderProfile("openai", "OpenAI", "gpt-4o-mini-transcribe", _openai_fields, _missing_environment_value("openai_api_key", "OPENAI_API_KEY"), _build_openai),
     "gcp": ProviderProfile("gcp", "Google Cloud", "chirp_3", _gcp_fields, _missing_field_value("project_id"), _build_gcp),
+    "local": ProviderProfile("local", "Faster Whisper (Local)", "base.en", _local_fields, _no_missing_value, _build_local),
 }
 
 

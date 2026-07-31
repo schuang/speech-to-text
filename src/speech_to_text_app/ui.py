@@ -7,7 +7,12 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from .config import AppConfig, LANGUAGE_OPTIONS, language_code_for_selection
+from .config import (
+    AppConfig,
+    LANGUAGE_OPTIONS,
+    compatible_local_model,
+    language_code_for_selection,
+)
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
 from .microphones import input_device_name
@@ -47,6 +52,7 @@ class DictationApp(tk.Tk):
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._session: ManualDictationSession | None = None
         self._hotkey_listener: HotkeyListener | None = None
+        self._automatic_local_model_pair: tuple[str, str] | None = None
         self._recording_indicator = FloatingRecordingIndicator(self)
         self._recording_meter: RecordingMeter | None = None
 
@@ -119,6 +125,7 @@ class DictationApp(tk.Tk):
         language_combo.grid(
             row=row, column=1, sticky="ew", pady=(0, 8)
         )
+        language_combo.bind("<<ComboboxSelected>>", self._on_language_selected)
         row += 1
 
         ttk.Label(config_frame, text="Model").grid(
@@ -201,14 +208,30 @@ class DictationApp(tk.Tk):
             messagebox.showerror("Provider unavailable", validation_error)
             return
 
+        language_code = language_code_for_selection(self.language_var.get())
+        selected_model = self.model_var.get().strip() or self._provider_profile.default_model
+        if self._provider == "local":
+            compatible_model = compatible_local_model(selected_model, language_code)
+            if compatible_model != selected_model:
+                self._automatic_local_model_pair = (
+                    selected_model,
+                    compatible_model,
+                )
+                selected_model = compatible_model
+                self.model_var.set(selected_model)
+
         config = AppConfig(
             provider=self._provider,
             project_id=provider_values.get("project_id", ""),
-            language_code=language_code_for_selection(self.language_var.get()),
-            model=self.model_var.get().strip() or self._provider_profile.default_model,
+            language_code=language_code,
+            model=selected_model,
             hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
             recognizer_location=provider_values.get("recognizer_location", "us") or "us",
             openai_api_key=provider_values.get("openai_api_key", ""),
+            local_device=provider_values.get("local_device", "cpu") or "cpu",
+            local_compute_type=(
+                provider_values.get("local_compute_type", "int8") or "int8"
+            ),
         )
 
         try:
@@ -234,6 +257,35 @@ class DictationApp(tk.Tk):
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.status_var.set("Starting recording...")
+
+    def _on_language_selected(self, _event: object) -> None:
+        if self._provider != "local":
+            return
+
+        language_code = language_code_for_selection(self.language_var.get())
+        selected_model = self.model_var.get().strip() or self._provider_profile.default_model
+
+        if language_code.lower().startswith("en"):
+            if (
+                self._automatic_local_model_pair is not None
+                and selected_model == self._automatic_local_model_pair[1]
+            ):
+                self.model_var.set(self._automatic_local_model_pair[0])
+            self._automatic_local_model_pair = None
+            return
+
+        compatible_model = compatible_local_model(selected_model, language_code)
+        if compatible_model != selected_model:
+            self._automatic_local_model_pair = (
+                selected_model,
+                compatible_model,
+            )
+            self.model_var.set(compatible_model)
+        elif (
+            self._automatic_local_model_pair is not None
+            and selected_model != self._automatic_local_model_pair[1]
+        ):
+            self._automatic_local_model_pair = None
 
     def _stop_session(self) -> None:
         if self._session is not None:

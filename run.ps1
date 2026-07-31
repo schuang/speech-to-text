@@ -66,7 +66,7 @@ try {
         $PSNativeCommandUseErrorActionPreference = $false
     }
 
-    & $venvPython -c "import speech_to_text_app" *> $null
+    & $venvPython -c "import faster_whisper; import speech_to_text_app" *> $null
     $packageInstalled = ($LASTEXITCODE -eq 0)
 }
 finally {

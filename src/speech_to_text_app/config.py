@@ -60,6 +60,17 @@ def language_label_for_code(language_code: str) -> str:
     )
 
 
+def compatible_local_model(model: str, language_code: str) -> str:
+    """Replace an English-only Whisper model for non-English transcription."""
+    selected_model = model.strip()
+    normalized_language = language_code_for_selection(language_code).lower()
+    if not normalized_language.startswith("en") and selected_model.lower().endswith(
+        ".en"
+    ):
+        return selected_model[:-3]
+    return selected_model
+
+
 def _default_hotkey() -> str:
     if sys.platform == "darwin":
         return "ctrl+shift+space"
@@ -68,7 +79,7 @@ def _default_hotkey() -> str:
 
 def _resolve_provider_from_env() -> str:
     explicit_provider = os.getenv("SPEECH_PROVIDER", "").strip().lower()
-    if explicit_provider in {"gcp", "openai"}:
+    if explicit_provider in {"gcp", "openai", "local"}:
         return explicit_provider
     return "gcp"
 
@@ -78,11 +89,13 @@ class AppConfig:
     provider: str = "gcp"
     project_id: str = ""
     language_code: str = "en-US"
-    model: str = "chirp_3"
+    model: str = ""
     hotkey: str = _default_hotkey()
     recognizer_location: str = "us"
     recognizer_id: str = "_"
     openai_api_key: str = ""
+    local_device: str = "cpu"
+    local_compute_type: str = "int8"
     sample_rate_hz: int = 16_000
     chunk_ms: int = 100
     append_trailing_space: bool = True
@@ -91,7 +104,7 @@ class AppConfig:
     @property
     def normalized_provider(self) -> str:
         provider = self.provider.strip().lower()
-        if provider in {"gcp", "openai"}:
+        if provider in {"gcp", "openai", "local"}:
             return provider
         return "gcp"
 
@@ -116,6 +129,8 @@ class AppConfig:
             return "gpt-4o-mini-transcribe"
         if self.normalized_provider == "gcp":
             return "chirp_3"
+        if self.normalized_provider == "local":
+            return "base.en"
         return "chirp_3"
 
     @property
@@ -124,6 +139,10 @@ class AppConfig:
         if language_code.startswith(("cmn-", "zh-")):
             return "zh"
         return language_code.split("-", 1)[0]
+
+    @property
+    def whisper_language(self) -> str:
+        return self.openai_language
 
     @property
     def language_display_name(self) -> str:
@@ -137,10 +156,15 @@ class AppConfig:
         hotkey = os.getenv("DICTATION_HOTKEY", default_hotkey).strip() or default_hotkey
         recognizer_location = os.getenv("GOOGLE_CLOUD_LOCATION", "us").strip() or "us"
         openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        local_device = os.getenv("LOCAL_WHISPER_DEVICE", "cpu").strip() or "cpu"
+        local_compute_type = (
+            os.getenv("LOCAL_WHISPER_COMPUTE_TYPE", "int8").strip() or "int8"
+        )
         configured_model = os.getenv("SPEECH_MODEL", "").strip()
         default_model = {
             "gcp": "chirp_3",
             "openai": "gpt-4o-mini-transcribe",
+            "local": "base.en",
         }[provider]
         return cls(
             provider=provider,
@@ -149,4 +173,6 @@ class AppConfig:
             hotkey=hotkey,
             recognizer_location=recognizer_location,
             openai_api_key=openai_api_key,
+            local_device=local_device,
+            local_compute_type=local_compute_type,
         )

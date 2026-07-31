@@ -8,7 +8,7 @@ This project is a small desktop app written in Python. It records your speech be
 - Uses explicit manual start/stop recording instead of silence-based auto-stop.
 - Supports global hotkeys on macOS and Windows.
 - Shows a small Windows recording meter while audio is being captured.
-- Supports Google Cloud Speech-to-Text V2 and OpenAI transcription models.
+- Supports Google Cloud Speech-to-Text V2, OpenAI, and local Faster Whisper transcription models.
 - Detects the active provider from your environment.
 - Shows finalized transcripts in a local control window.
 - Pastes final transcript text into the active application, such as a terminal, VS Code, LibreOffice, Word, or a browser text field.
@@ -20,6 +20,7 @@ This project is a small desktop app written in Python. It records your speech be
 - `uv`, or Python 3.11+ installed and available on `PATH`
 - For the default GCP mode: a Google Cloud project with Speech-to-Text enabled plus local auth
 - For OpenAI mode: an `OPENAI_API_KEY`
+- For local mode: enough disk space to download the selected Faster Whisper model on first use
 - For Linux text injection:
   - `xdotool` on X11, or
   - `wtype` on Wayland
@@ -113,7 +114,7 @@ uv sync
 
    Provider detection works like this:
 
-   - If `SPEECH_PROVIDER` is set to `gcp` or `openai`, the app uses that value.
+   - If `SPEECH_PROVIDER` is set to `gcp`, `openai`, or `local`, the app uses that value.
    - Otherwise, the app uses Google Cloud Speech-to-Text.
 
    For Google Cloud Speech-to-Text:
@@ -149,6 +150,163 @@ uv sync
    $env:SPEECH_PROVIDER="openai"
    $env:OPENAI_API_KEY="your-openai-api-key"
    ```
+
+   For local transcription, follow [Local Faster Whisper Setup](#local-faster-whisper-setup). Local mode does not require a cloud account or API key.
+
+## Local Faster Whisper Setup
+
+Faster Whisper runs transcription on the computer. Audio is not uploaded to Google Cloud or OpenAI when `SPEECH_PROVIDER=local`. Installing the Python dependencies and downloading a model require internet access once; after that, local transcription can run offline.
+
+The portable defaults are:
+
+```text
+Provider:     local
+Model:        base.en
+Device:       cpu
+Compute type: int8
+```
+
+### Windows: fresh installation
+
+Install Python 3.11 or newer, then clone and launch the project:
+
+```powershell
+git clone https://github.com/schuang/speech-to-text.git
+cd speech-to-text
+.\run.ps1 -Provider local
+```
+
+The PowerShell launcher creates `.venv` when needed and installs the dependencies declared by the project. If PowerShell script execution is blocked, use the Command Prompt launcher:
+
+```bat
+run.cmd -Provider local
+```
+
+You can also configure local mode through environment variables:
+
+```powershell
+$env:SPEECH_PROVIDER="local"
+$env:SPEECH_MODEL="base.en"
+$env:LOCAL_WHISPER_DEVICE="cpu"
+$env:LOCAL_WHISPER_COMPUTE_TYPE="int8"
+.\run.ps1
+```
+
+### Linux: fresh installation
+
+On Ubuntu or Debian, install Python, Tkinter, PortAudio, and the desktop integration tools:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-tk libportaudio2 xdotool wtype xclip wl-clipboard
+```
+
+Clone the project and install it into a virtual environment:
+
+```bash
+git clone https://github.com/schuang/speech-to-text.git
+cd speech-to-text
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e .
+
+export SPEECH_PROVIDER="local"
+export SPEECH_MODEL="base.en"
+export LOCAL_WHISPER_DEVICE="cpu"
+export LOCAL_WHISPER_COMPUTE_TYPE="int8"
+./run.sh
+```
+
+Linux global hotkeys are not currently enabled, so use the graphical Start Recording and Stop And Transcribe buttons.
+
+### macOS: fresh installation
+
+Install Python 3.11 or newer with Tkinter support and ensure PortAudio is available. Then run:
+
+```bash
+git clone https://github.com/schuang/speech-to-text.git
+cd speech-to-text
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e .
+
+export SPEECH_PROVIDER="local"
+export SPEECH_MODEL="base.en"
+export LOCAL_WHISPER_DEVICE="cpu"
+export LOCAL_WHISPER_COMPUTE_TYPE="int8"
+./run.sh
+```
+
+Grant Microphone access so the app can record. Grant Accessibility access to the terminal or Python application so global hotkeys and text insertion work. Faster Whisper uses CPU inference on macOS; the NVIDIA CUDA path is for supported Windows and Linux systems.
+
+### Download the model before first use
+
+Normally, the selected model downloads automatically when the first recording is transcribed. To download and validate `base.en` in advance, activate the project virtual environment and run:
+
+```bash
+python -c "from faster_whisper import WhisperModel; WhisperModel('base.en', device='cpu', compute_type='int8'); print('Model ready')"
+```
+
+On Windows, the same command can be run without activating the environment:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from faster_whisper import WhisperModel; WhisperModel('base.en', device='cpu', compute_type='int8'); print('Model ready')"
+```
+
+The model is cached rather than stored in this Git repository. Default cache locations are:
+
+- Windows: `C:\Users\<username>\.cache\huggingface\hub`
+- Linux and macOS: `~/.cache/huggingface/hub`
+
+Set `HF_HOME` before downloading if the cache should live somewhere else. For a computer that must remain offline, install the Python dependencies and pre-download the model while connected, or copy the complete Hugging Face model cache from another compatible installation.
+
+### Choose a local model
+
+| Model | Language | Tradeoff |
+|---|---|---|
+| `tiny.en` | English only | Fastest, with the lowest accuracy |
+| `base.en` | English only | Default; recommended starting point |
+| `base` | Multilingual | Use for Mandarin and other non-English speech |
+| `small.en` | English only | Better accuracy, but slower and larger |
+| `small` | Multilingual | Better multilingual accuracy, but slower and larger |
+
+When a non-English language is selected, the UI automatically changes an English-only model to its multilingual counterpart—for example, `base.en` becomes `base` and `small.en` becomes `small`. If the language is changed back to English, the UI restores the English-only model it changed automatically. A multilingual model selected manually is left unchanged. The first transcription after each application launch includes model-loading time; later recordings reuse the model already held in memory.
+
+### Mandarin example
+
+Mandarin requires a multilingual model. Do not use `base.en` or another model ending in `.en`.
+
+On Windows PowerShell, start local mode with the multilingual `base` model:
+
+```powershell
+$env:SPEECH_PROVIDER="local"
+$env:SPEECH_MODEL="base"
+$env:LOCAL_WHISPER_DEVICE="cpu"
+$env:LOCAL_WHISPER_COMPUTE_TYPE="int8"
+.\run.ps1
+```
+
+On Linux or macOS:
+
+```bash
+export SPEECH_PROVIDER="local"
+export SPEECH_MODEL="base"
+export LOCAL_WHISPER_DEVICE="cpu"
+export LOCAL_WHISPER_COMPUTE_TYPE="int8"
+./run.sh
+```
+
+In the graphical UI, set **Language** to **Chinese (Mandarin, Taiwan)** before recording. For example, dictate:
+
+```text
+請幫我安排明天下午三點的會議，並提醒我準備專案進度報告。
+```
+
+This means: “Please schedule a meeting for three o'clock tomorrow afternoon, and remind me to prepare the project status report.” The model downloads on the first Mandarin transcription if it is not already cached; later use is local and offline.
+
+CPU INT8 is the cross-platform configuration. Advanced Windows or Linux installations with a compatible NVIDIA GPU can set `LOCAL_WHISPER_DEVICE=cuda` and a supported compute type such as `int8_float16`, but CUDA and cuDNN must be installed separately. If those libraries are not configured, keep the CPU defaults.
 
 ## Run
 
@@ -297,6 +455,10 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - When Google Cloud is active, the UI hides OpenAI-specific status rows.
 - The default GCP model is `chirp_3`.
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
+- The default local model is `base.en`, using CPU INT8 inference.
+- Local Faster Whisper downloads its model on first use, then transcribes offline from the cached model.
+- Set `SPEECH_MODEL=base` when using the local provider for Mandarin or other non-English speech.
+- Set `LOCAL_WHISPER_DEVICE` and `LOCAL_WHISPER_COMPUTE_TYPE` to opt into a supported accelerator configuration.
 - The default GCP location is `us`.
 - The GUI language field is a dropdown with presets for English (United States) and Chinese (Mandarin, Taiwan). You can still type a locale manually if you need a different language code.
 - Windows text injection uses Unicode keyboard events.
@@ -313,6 +475,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - Global hotkeys are currently supported on Windows and macOS. Linux can still use the UI buttons for manual start/stop.
 - The GCP backend transcribes one recorded utterance at a time.
 - The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
+- The Faster Whisper backend processes recorded utterances locally and caches loaded models for reuse between recordings.
 
 ## Project Layout
 
