@@ -3,6 +3,10 @@ from .base import SpeechProvider
 
 
 def build_speech_provider(config: AppConfig) -> SpeechProvider:
+    if config.normalized_provider == "gemini":
+        from .gemini_utterance import GeminiUtteranceProvider
+
+        return GeminiUtteranceProvider(config)
     if config.normalized_provider == "openai":
         from .openai_utterance import OpenAIUtteranceProvider
 

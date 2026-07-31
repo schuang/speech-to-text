@@ -10,8 +10,20 @@ fi
 
 source .venv/bin/activate
 
-provider="${SPEECH_PROVIDER:-gcp}"
+provider="${SPEECH_PROVIDER:-gemini}"
 export SPEECH_PROVIDER="$provider"
+
+if [[ "$provider" == "gemini" && -z "${GEMINI_API_KEY:-}" ]]; then
+  cat >&2 <<'EOF'
+GEMINI_API_KEY is required for Gemini mode, for example:
+
+export GEMINI_API_KEY="your-gemini-api-key"
+./run.sh
+
+Set SPEECH_PROVIDER=gcp, openai, or ollama to use another provider.
+EOF
+  exit 1
+fi
 
 if [[ "$provider" == "gcp" && -z "${GOOGLE_CLOUD_PROJECT:-}" ]]; then
   cat >&2 <<'EOF'

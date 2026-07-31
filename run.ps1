@@ -83,7 +83,7 @@ if (-not $Provider) {
 }
 
 if (-not $Provider) {
-    $Provider = "gcp"
+    $Provider = "gemini"
 }
 
 $env:SPEECH_PROVIDER = $Provider
@@ -105,6 +105,14 @@ if ($SmokeTest) {
     Write-Output ("OLLAMA_MODEL=" + $env:OLLAMA_MODEL)
     & $venvPython -c "import sys; import speech_to_text_app; print(sys.executable)"
     exit $LASTEXITCODE
+}
+
+if ($Provider -eq "gemini" -and -not $env:GEMINI_API_KEY) {
+    throw (
+        "GEMINI_API_KEY is required for Gemini mode. Set it first, for example:`n`n" +
+        '$env:GEMINI_API_KEY="your-gemini-api-key"' +
+        "`n.\\run.ps1"
+    )
 }
 
 if ($Provider -eq "gcp" -and -not $ProjectId) {

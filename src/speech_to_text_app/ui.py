@@ -68,6 +68,7 @@ class DictationApp(tk.Tk):
         row = 0
 
         provider_name = {
+            "gemini": "Google Gemini",
             "openai": "OpenAI",
             "ollama": "Ollama",
         }.get(self._provider, "Google Cloud")
@@ -79,7 +80,15 @@ class DictationApp(tk.Tk):
         )
         row += 1
 
-        if self._provider == "openai":
+        if self._provider == "gemini":
+            ttk.Label(config_frame, text="API Key").grid(
+                row=row, column=0, sticky="w", pady=(0, 8)
+            )
+            ttk.Label(config_frame, text="Loaded from GEMINI_API_KEY").grid(
+                row=row, column=1, sticky="w", pady=(0, 8)
+            )
+            row += 1
+        elif self._provider == "openai":
             ttk.Label(config_frame, text="API Key").grid(
                 row=row, column=0, sticky="w", pady=(0, 8)
             )
@@ -218,6 +227,12 @@ class DictationApp(tk.Tk):
                 "Enter a Google Cloud project ID or set GOOGLE_CLOUD_PROJECT for GCP mode.",
             )
             return
+        if provider == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
+            messagebox.showerror(
+                "Missing Gemini API key",
+                "Set GEMINI_API_KEY before starting Gemini mode.",
+            )
+            return
         if provider == "openai" and not os.getenv("OPENAI_API_KEY", "").strip():
             messagebox.showerror(
                 "Missing OpenAI API key",
@@ -239,6 +254,7 @@ class DictationApp(tk.Tk):
             model=self.model_var.get().strip() or self._default_model_for_provider(provider),
             hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
             recognizer_location=self.location_var.get().strip() or "us",
+            gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
             openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
             ollama_base_url=ollama_base_url,
         )
@@ -335,9 +351,11 @@ class DictationApp(tk.Tk):
 
     def _default_model_for_provider(self, provider: str) -> str:
         return {
+            "gemini": "gemini-3.6-flash",
+            "gcp": "chirp_3",
             "openai": "gpt-4o-mini-transcribe",
             "ollama": "gemma4:default",
-        }.get(provider, "chirp_3")
+        }.get(provider, "gemini-3.6-flash")
 
     def _start_hotkey_listener(self) -> None:
         hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY

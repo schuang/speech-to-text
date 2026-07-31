@@ -12,6 +12,24 @@ from speech_to_text_app.config import (
 
 
 class AppConfigTests(unittest.TestCase):
+    def test_from_env_defaults_to_gemini(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = AppConfig.from_env()
+
+        self.assertEqual(config.normalized_provider, "gemini")
+        self.assertEqual(config.resolved_model, "gemini-3.6-flash")
+
+    def test_from_env_uses_gemini_api_key(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"GEMINI_API_KEY": "test-key"},
+            clear=True,
+        ):
+            config = AppConfig.from_env()
+
+        self.assertEqual(config.normalized_provider, "gemini")
+        self.assertEqual(config.gemini_api_key, "test-key")
+
     def test_from_env_prefers_explicit_speech_provider(self) -> None:
         with patch.dict(
             os.environ,
@@ -25,24 +43,27 @@ class AppConfigTests(unittest.TestCase):
 
         self.assertEqual(config.normalized_provider, "gcp")
 
-    def test_from_env_uses_openai_when_api_key_is_present(self) -> None:
+    def test_from_env_defaults_to_gemini_when_other_credentials_are_present(
+        self,
+    ) -> None:
         with patch.dict(
             os.environ,
             {
                 "SPEECH_PROVIDER": "",
                 "OPENAI_API_KEY": "test-key",
+                "OLLAMA_BASE_URL": "http://ollama.example:11434",
             },
-            clear=False,
+            clear=True,
         ):
             config = AppConfig.from_env()
 
-        self.assertEqual(config.normalized_provider, "openai")
+        self.assertEqual(config.normalized_provider, "gemini")
 
-    def test_from_env_uses_ollama_when_ollama_env_is_present(self) -> None:
+    def test_from_env_uses_explicit_ollama_provider(self) -> None:
         with patch.dict(
             os.environ,
             {
-                "SPEECH_PROVIDER": "",
+                "SPEECH_PROVIDER": "ollama",
                 "OPENAI_API_KEY": "",
                 "OLLAMA_BASE_URL": "http://ollama.example:11434",
                 "OLLAMA_MODEL": "gemma4:custom",
