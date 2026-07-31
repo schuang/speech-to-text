@@ -14,7 +14,6 @@ class GeminiUtteranceProviderTests(unittest.TestCase):
     def test_transcribe_audio_sends_wav_and_returns_text(self) -> None:
         config = AppConfig(
             provider="gemini",
-            model="gemini-3.6-flash",
             gemini_api_key="test-key",
             sample_rate_hz=16_000,
         )
@@ -36,7 +35,7 @@ class GeminiUtteranceProviderTests(unittest.TestCase):
 
         self.assertEqual(transcript, "hello world")
         client_mock.assert_called_once_with(api_key="test-key")
-        self.assertEqual(captured_request["model"], "gemini-3.6-flash")
+        self.assertEqual(captured_request["model"], "gemini-3.5-flash-lite")
 
         prompt, audio_part = captured_request["contents"]
         self.assertIn("English (United States)", prompt)

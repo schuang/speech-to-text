@@ -130,7 +130,7 @@ uv sync
    $env:GEMINI_API_KEY="your-gemini-api-key"
    ```
 
-   Optional: override the default `gemini-3.6-flash` model:
+   Optional: override the default `gemini-3.5-flash-lite` model:
 
    ```powershell
    $env:SPEECH_MODEL="another-gemini-model"
@@ -347,7 +347,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - When Gemini is active, the UI loads its API key from `GEMINI_API_KEY`.
 - When Ollama is active, the UI expects `OLLAMA_BASE_URL` from the environment and uses the model field for the Ollama model name.
 - When Google Cloud is active, the UI hides OpenAI-specific status rows.
-- The default Gemini model is `gemini-3.6-flash`.
+- The default Gemini model is `gemini-3.5-flash-lite`.
 - The default GCP model is `chirp_3`.
 - The default OpenAI model is `gpt-4o-mini-transcribe`.
 - The default Ollama model is `gemma4:default`, but `OLLAMA_MODEL` overrides it.

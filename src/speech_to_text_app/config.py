@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 _DEFAULT_OLLAMA_BASE_URL = ""
 _DEFAULT_OLLAMA_MODEL = "gemma4:default"
-_DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+_DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,7 @@ class AppConfigTests(unittest.TestCase):
             config = AppConfig.from_env()
 
         self.assertEqual(config.normalized_provider, "gemini")
-        self.assertEqual(config.resolved_model, "gemini-3.6-flash")
+        self.assertEqual(config.resolved_model, "gemini-3.5-flash-lite")
 
     def test_from_env_uses_gemini_api_key(self) -> None:
         with patch.dict(

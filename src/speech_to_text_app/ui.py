@@ -351,11 +351,11 @@ class DictationApp(tk.Tk):
 
     def _default_model_for_provider(self, provider: str) -> str:
         return {
-            "gemini": "gemini-3.6-flash",
+            "gemini": "gemini-3.5-flash-lite",
             "gcp": "chirp_3",
             "openai": "gpt-4o-mini-transcribe",
             "ollama": "gemma4:default",
-        }.get(provider, "gemini-3.6-flash")
+        }.get(provider, "gemini-3.5-flash-lite")
 
     def _start_hotkey_listener(self) -> None:
         hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY
