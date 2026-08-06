@@ -50,15 +50,17 @@ class ManualAudioRecorder:
         sample_rate_hz: int,
         chunk_ms: int,
         on_level: LevelCallback | None = None,
+        input_device_index: int | None = None,
     ) -> None:
         self.sample_rate_hz = sample_rate_hz
         self.chunk_ms = chunk_ms
         self.on_level = on_level or (lambda _level: None)
+        self.input_device_index = input_device_index
         self.frames_per_buffer = max(1, int(sample_rate_hz * (chunk_ms / 1000.0)))
         self._stream: sd.RawInputStream | None = None
         self._closed = True
         self._buffer = bytearray()
-        self.microphone_name = input_device_name()
+        self.microphone_name = input_device_name(input_device_index)
 
     @property
     def recording(self) -> bool:
@@ -77,6 +79,7 @@ class ManualAudioRecorder:
                 channels=1,
                 dtype="int16",
                 callback=self._audio_callback,
+                device=self.input_device_index,
             )
             self.microphone_name = input_device_name(
                 getattr(self._stream, "device", None)

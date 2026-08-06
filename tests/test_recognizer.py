@@ -30,8 +30,15 @@ class _FakeProvider:
 
 
 class _FakeRecorder:
-    def __init__(self, sample_rate_hz: int, chunk_ms: int, on_level=None) -> None:
+    def __init__(
+        self,
+        sample_rate_hz: int,
+        chunk_ms: int,
+        on_level=None,
+        input_device_index: int | None = None,
+    ) -> None:
         del sample_rate_hz, chunk_ms, on_level
+        self.input_device_index = input_device_index
         self._recording = False
 
     @property
@@ -53,7 +60,7 @@ class ManualDictationSessionTests(unittest.TestCase):
     def test_start_recording_captures_current_target(self) -> None:
         injector = _FakeInjector()
         session = ManualDictationSession(
-            config=AppConfig(),
+            config=AppConfig(input_device_index=7),
             injector=injector,
             provider=_FakeProvider(),
         )
@@ -62,6 +69,7 @@ class ManualDictationSessionTests(unittest.TestCase):
             session.start_recording()
 
         self.assertEqual(session._injection_target, "com.apple.Safari")
+        self.assertEqual(session._recorder.input_device_index, 7)
 
     def test_restore_target_focus_uses_captured_target(self) -> None:
         injector = _FakeInjector()

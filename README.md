@@ -5,6 +5,7 @@ This project is a small desktop app written in Python. It records your speech be
 ## What It Does
 
 - Uses your local microphone as the audio source.
+- Shows a microphone selector when multiple USB input devices are connected.
 - Uses explicit manual start/stop recording instead of silence-based auto-stop.
 - Supports global hotkeys on macOS and Windows.
 - Shows a small Windows recording meter while audio is being captured.
@@ -447,6 +448,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - Set `LOCAL_WHISPER_DEVICE` and `LOCAL_WHISPER_COMPUTE_TYPE` to opt into a supported accelerator configuration.
 - The default GCP location is `us`.
 - The GUI language field is a dropdown with presets for English (United States) and Chinese (Mandarin, Taiwan). You can still type a locale manually if you need a different language code.
+- When two or more USB microphones are detected at startup, the selected microphone is used for subsequent recordings. With fewer USB microphones, the system default input remains active.
 - Windows text injection uses Unicode keyboard events.
 - On macOS, local apps default to `Command+V` for clipboard paste fallback.
 - On macOS, browser targets use clipboard paste so web text inputs receive the normal paste event.

@@ -96,6 +96,7 @@ class AppConfig:
     openai_api_key: str = ""
     local_device: str = "cpu"
     local_compute_type: str = "int8"
+    input_device_index: int | None = None
     sample_rate_hz: int = 16_000
     chunk_ms: int = 100
     append_trailing_space: bool = True

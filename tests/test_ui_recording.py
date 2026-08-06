@@ -52,6 +52,7 @@ class DictationAppRecordingTests(unittest.TestCase):
             validate=lambda _values: None,
         )
         app._provider_field_vars = {}
+        app._usb_microphones = ()
         app._automatic_local_model_pair = None
         app.language_var = _FakeStringVar("English (United States)")
         app.model_var = _FakeStringVar("base.en")

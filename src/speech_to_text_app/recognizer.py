@@ -52,7 +52,7 @@ class ManualDictationSession:
     def microphone_name(self) -> str:
         if self._recorder is not None:
             return self._recorder.microphone_name
-        return input_device_name()
+        return input_device_name(self.config.input_device_index)
 
     def start_recording(self) -> None:
         if self.recording or self.transcribing:
@@ -62,6 +62,7 @@ class ManualDictationSession:
             sample_rate_hz=self.config.sample_rate_hz,
             chunk_ms=self.config.chunk_ms,
             on_level=self.on_level,
+            input_device_index=self.config.input_device_index,
         )
         self._injection_target = self.injector.capture_target()
         try:

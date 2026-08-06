@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from speech_to_text_app.audio import ManualAudioRecorder
 from speech_to_text_app.microphones.fallback import (
     input_device_name as fallback_input_device_name,
 )
@@ -43,6 +44,31 @@ class InputDeviceNameTests(unittest.TestCase):
             fallback_input_device_name(object()),
             "System default microphone",
         )
+
+
+class ManualAudioRecorderTests(unittest.TestCase):
+    def test_selected_input_device_is_passed_to_audio_stream(self) -> None:
+        stream = MagicMock(device=7)
+
+        with (
+            patch(
+                "speech_to_text_app.audio.input_device_name",
+                return_value="USB Conference Microphone",
+            ),
+            patch(
+                "speech_to_text_app.audio.sd.RawInputStream",
+                return_value=stream,
+            ) as raw_input_stream,
+        ):
+            recorder = ManualAudioRecorder(
+                sample_rate_hz=16_000,
+                chunk_ms=100,
+                input_device_index=7,
+            )
+            recorder.start()
+
+        self.assertEqual(raw_input_stream.call_args.kwargs["device"], 7)
+        stream.start.assert_called_once_with()
 
 
 if __name__ == "__main__":

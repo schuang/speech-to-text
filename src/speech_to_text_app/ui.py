@@ -15,7 +15,7 @@ from .config import (
 )
 from .hotkeys import HotkeyError, HotkeyListener, build_hotkey_listener
 from .injectors import TextInjectorError, build_text_injector
-from .microphones import input_device_name
+from .microphones import InputDevice, input_device_name, usb_input_devices
 from .providers import provider_profile
 from .recognizer import ManualDictationSession
 from .recording_indicator import FloatingRecordingIndicator
@@ -47,6 +47,7 @@ class DictationApp(tk.Tk):
             value=default_config.model or self._provider_profile.default_model
         )
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
+        self._usb_microphones: tuple[InputDevice, ...] = usb_input_devices()
         self.microphone_var = tk.StringVar(value=input_device_name())
         self.status_var = tk.StringVar(value="Idle")
 
@@ -93,11 +94,22 @@ class DictationApp(tk.Tk):
         ttk.Label(config_frame, text="Microphone").grid(
             row=row, column=0, sticky="w", pady=(0, 8)
         )
-        ttk.Label(
-            config_frame,
-            textvariable=self.microphone_var,
-            wraplength=300,
-        ).grid(row=row, column=1, columnspan=2, sticky="w", pady=(0, 8))
+        if len(self._usb_microphones) > 1:
+            ttk.Combobox(
+                config_frame,
+                textvariable=self.microphone_var,
+                values=[
+                    self.microphone_var.get(),
+                    *(device.label for device in self._usb_microphones),
+                ],
+                state="readonly",
+            ).grid(row=row, column=1, columnspan=2, sticky="ew", pady=(0, 8))
+        else:
+            ttk.Label(
+                config_frame,
+                textvariable=self.microphone_var,
+                wraplength=300,
+            ).grid(row=row, column=1, columnspan=2, sticky="w", pady=(0, 8))
         row += 1
 
         for field in self._provider_fields:
@@ -243,6 +255,7 @@ class DictationApp(tk.Tk):
             local_compute_type=(
                 provider_values.get("local_compute_type", "int8") or "int8"
             ),
+            input_device_index=self._selected_input_device_index(),
         )
 
         try:
@@ -259,7 +272,8 @@ class DictationApp(tk.Tk):
             on_level=lambda level: self._events.put(("level", level)),
         )
         self._session.start_recording()
-        self.microphone_var.set(self._session.microphone_name)
+        if len(self._usb_microphones) <= 1:
+            self.microphone_var.set(self._session.microphone_name)
 
         if self._session.recording:
             self._clear_final_text()
@@ -298,6 +312,16 @@ class DictationApp(tk.Tk):
             and selected_model != self._automatic_local_model_pair[1]
         ):
             self._automatic_local_model_pair = None
+
+    def _selected_input_device_index(self) -> int | None:
+        if len(self._usb_microphones) <= 1:
+            return None
+
+        selected_label = self.microphone_var.get()
+        for device in self._usb_microphones:
+            if device.label == selected_label:
+                return device.index
+        return None
 
     def _stop_session(self) -> None:
         if self._session is not None:
