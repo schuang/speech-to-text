@@ -111,7 +111,7 @@ def _key_identity(key: keyboard.Key | keyboard.KeyCode | None) -> str | None:
 class MacOSHotkeyListener:
     def __init__(
         self,
-        hotkey: str,
+        hotkey: str | tuple[str, ...],
         callback: ModifierCallback,
         release_callback: ModifierCallback | None = None,
     ) -> None:
@@ -120,9 +120,14 @@ class MacOSHotkeyListener:
         self.release_callback = release_callback or (lambda: None)
         self._listener: keyboard.Listener | None = None
         self._pressed: set[str] = set()
-        self._active = False
-        self._required_modifiers, self._trigger_key = _parse_hotkey(hotkey)
-        self._suppressed_vk = self._resolve_suppressed_vk(self._trigger_key)
+        self._active_hotkeys: set[int] = set()
+        hotkeys = (hotkey,) if isinstance(hotkey, str) else hotkey
+        self._parsed_hotkeys = tuple(_parse_hotkey(value) for value in hotkeys)
+        self._suppressed_vks = frozenset(
+            vk
+            for _modifiers, trigger_key in self._parsed_hotkeys
+            if (vk := self._resolve_suppressed_vk(trigger_key)) is not None
+        )
 
     def start(self) -> None:
         if self._listener is not None:
@@ -148,7 +153,7 @@ class MacOSHotkeyListener:
         self._listener.stop()
         self._listener = None
         self._pressed.clear()
-        self._active = False
+        self._active_hotkeys.clear()
 
     def _on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
         key_identity = _key_identity(key)
@@ -164,27 +169,26 @@ class MacOSHotkeyListener:
         self._update_hotkey_state()
 
     def _update_hotkey_state(self) -> None:
-        is_active = self._trigger_key in self._pressed and self._required_modifiers.issubset(
-            self._pressed
-        )
+        active_hotkeys = {
+            index
+            for index, (required_modifiers, trigger_key) in enumerate(
+                self._parsed_hotkeys
+            )
+            if trigger_key in self._pressed
+            and required_modifiers.issubset(self._pressed)
+        }
 
-        if is_active and not self._active:
-            self._active = True
+        for _index in active_hotkeys - self._active_hotkeys:
             self.callback()
-            return
-
-        if self._active and not is_active:
-            self._active = False
+        for _index in self._active_hotkeys - active_hotkeys:
             self.release_callback()
+        self._active_hotkeys = active_hotkeys
 
     def _intercept_event(self, event_type, event):
         del event_type
 
-        if self._suppressed_vk is None:
-            return event
-
         keycode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
-        if keycode == self._suppressed_vk:
+        if keycode in self._suppressed_vks:
             return None
         return event
 

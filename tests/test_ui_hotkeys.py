@@ -19,7 +19,7 @@ class _FakeStringVar:
 
 
 class _FakeListener:
-    def __init__(self, hotkey: str) -> None:
+    def __init__(self, hotkey: str | tuple[str, ...]) -> None:
         self.hotkey = hotkey
         self.started = False
         self.stopped = False
@@ -44,7 +44,10 @@ class DictationAppHotkeyTests(unittest.TestCase):
         app = self._app()
         listeners: list[_FakeListener] = []
 
-        def build_listener(hotkey: str, **_values: object) -> _FakeListener:
+        def build_listener(
+            hotkey: str | tuple[str, ...],
+            **_values: object,
+        ) -> _FakeListener:
             listener = _FakeListener(hotkey)
             listeners.append(listener)
             return listener
@@ -57,7 +60,7 @@ class DictationAppHotkeyTests(unittest.TestCase):
 
         self.assertEqual(
             [listener.hotkey for listener in listeners],
-            ["ctrl+shift+space", "f19"],
+            [("ctrl+shift+space", "f19")],
         )
         self.assertTrue(all(listener.started for listener in listeners))
         self.assertIn("ctrl+shift+space or f19", app.status_var.get())

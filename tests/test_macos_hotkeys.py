@@ -23,6 +23,23 @@ class ParseHotkeyTests(unittest.TestCase):
 
 
 class MacOSHotkeyListenerTests(unittest.TestCase):
+    def test_listener_fires_for_both_configured_hotkeys(self) -> None:
+        events: list[str] = []
+        listener = MacOSHotkeyListener(
+            hotkey=("ctrl+shift+space", "f19"),
+            callback=lambda: events.append("press"),
+            release_callback=lambda: events.append("release"),
+        )
+
+        listener._on_press(keyboard.Key.f19)
+        listener._on_release(keyboard.Key.f19)
+        listener._on_press(keyboard.Key.ctrl)
+        listener._on_press(keyboard.Key.shift)
+        listener._on_press(keyboard.Key.space)
+        listener._on_release(keyboard.Key.space)
+
+        self.assertEqual(events, ["press", "release", "press", "release"])
+
     def test_listener_fires_press_then_release_for_function_key(self) -> None:
         events: list[str] = []
         listener = MacOSHotkeyListener(

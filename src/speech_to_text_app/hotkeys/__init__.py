@@ -18,10 +18,16 @@ else:
     MacOSHotkeyListener = None
 
 
-def build_hotkey_listener(hotkey: str, callback, release_callback=None) -> HotkeyListener:
+def build_hotkey_listener(
+    hotkey: str | tuple[str, ...],
+    callback,
+    release_callback=None,
+) -> HotkeyListener:
     if sys.platform == "win32":
         if WindowsHotkeyListener is None:
             raise HotkeyError("Windows hotkey listener is unavailable.")
+        if not isinstance(hotkey, str):
+            raise HotkeyError("Windows hotkeys must be registered individually.")
         return WindowsHotkeyListener(
             hotkey=hotkey,
             callback=callback,

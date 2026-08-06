@@ -390,14 +390,13 @@ class DictationApp(tk.Tk):
         self._stop_hotkey_listeners()
 
         try:
-            for hotkey in hotkeys:
-                listener = build_hotkey_listener(
-                    hotkey=hotkey,
-                    callback=lambda: self._events.put(("toggle", "")),
-                    release_callback=None,
-                )
-                self._hotkey_listeners.append(listener)
-                listener.start()
+            listener = build_hotkey_listener(
+                hotkey=hotkeys if sys.platform == "darwin" else hotkeys[0],
+                callback=lambda: self._events.put(("toggle", "")),
+                release_callback=None,
+            )
+            self._hotkey_listeners.append(listener)
+            listener.start()
             hotkey_text = " or ".join(hotkeys)
             self.status_var.set(
                 f"Idle. Press {hotkey_text} to start or stop recording."
