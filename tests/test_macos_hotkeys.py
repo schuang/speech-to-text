@@ -10,10 +10,10 @@ from speech_to_text_app.hotkeys.macos import MacOSHotkeyListener, _parse_hotkey
 
 class ParseHotkeyTests(unittest.TestCase):
     def test_parse_hotkey_supports_function_key_without_modifiers(self) -> None:
-        modifiers, trigger = _parse_hotkey("f6")
+        modifiers, trigger = _parse_hotkey("f19")
 
         self.assertEqual(modifiers, frozenset())
-        self.assertEqual(trigger, "f6")
+        self.assertEqual(trigger, "f19")
 
     def test_parse_hotkey_supports_modified_hotkey(self) -> None:
         modifiers, trigger = _parse_hotkey("ctrl+alt+space")
@@ -26,19 +26,19 @@ class MacOSHotkeyListenerTests(unittest.TestCase):
     def test_listener_fires_press_then_release_for_function_key(self) -> None:
         events: list[str] = []
         listener = MacOSHotkeyListener(
-            hotkey="f6",
+            hotkey="f19",
             callback=lambda: events.append("press"),
             release_callback=lambda: events.append("release"),
         )
 
-        listener._on_press(keyboard.Key.f6)
-        listener._on_release(keyboard.Key.f6)
+        listener._on_press(keyboard.Key.f19)
+        listener._on_release(keyboard.Key.f19)
 
         self.assertEqual(events, ["press", "release"])
 
     def test_listener_suppresses_function_key_event(self) -> None:
         listener = MacOSHotkeyListener(
-            hotkey="f6",
+            hotkey="f19",
             callback=lambda: None,
             release_callback=lambda: None,
         )
@@ -46,7 +46,7 @@ class MacOSHotkeyListenerTests(unittest.TestCase):
 
         with patch(
             "speech_to_text_app.hotkeys.macos.CGEventGetIntegerValueField",
-            return_value=keyboard.Key.f6.value.vk,
+            return_value=keyboard.Key.f19.value.vk,
         ):
             self.assertIsNone(listener._intercept_event(None, raw_event))
 

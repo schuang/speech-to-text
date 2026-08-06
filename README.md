@@ -130,7 +130,7 @@ uv sync
    $env:GOOGLE_CLOUD_LOCATION="us"
    ```
 
-   Optional: set the global hotkey. On macOS the default is `ctrl+shift+space`. On Windows the default is `ctrl+alt+space`. Global hotkeys are currently supported on Windows and macOS.
+   Optional: set the primary global hotkey. On macOS the defaults are `ctrl+shift+space` and the secondary `F19` key. On Windows the default is `ctrl+alt+space`. Global hotkeys are currently supported on Windows and macOS.
 
    ```powershell
    $env:DICTATION_HOTKEY="ctrl+shift+space"
@@ -455,6 +455,7 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - Linux text injection uses `xdotool` on X11 or `wtype` on Wayland.
 - macOS text injection uses `pbcopy` and `osascript`, and requires Accessibility permission.
 - macOS global hotkeys use `pynput`, work while another app has focus, and also require Accessibility permission.
+- macOS registers `F19` as a secondary hotkey in addition to the configurable primary hotkey.
 - The default hotkey flow is toggle-to-record: press the hotkey once to start recording, then press it again to transcribe, paste into the focused field, and leave the transcript on the clipboard.
 - While recording or transcribing, the app shows a small floating status indicator so you can tell what state it is in even when the main window is hidden.
 - The macOS default uses modifiers specifically to avoid common browser `F6` focus shortcuts that jump to the address bar.

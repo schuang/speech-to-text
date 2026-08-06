@@ -14,7 +14,8 @@ def build_parser() -> argparse.ArgumentParser:
   3. Click Stop And Transcribe, or press the hotkey again.
   4. The transcript is pasted into the focused app and copied to the clipboard.
 
-The default hotkey is ctrl+alt+space on Windows and ctrl+shift+space on macOS.
+The default hotkey is ctrl+alt+space on Windows. On macOS, use
+ctrl+shift+space or the secondary F19 hotkey.
 The manual buttons remain available if the global hotkey cannot be used.
 """,
     )

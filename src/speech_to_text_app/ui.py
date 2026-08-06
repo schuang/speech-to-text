@@ -24,6 +24,7 @@ from .recording_meter import RecordingMeter
 
 class DictationApp(tk.Tk):
     _DEFAULT_HOTKEY = "ctrl+shift+space" if sys.platform == "darwin" else "ctrl+alt+space"
+    _MACOS_SECONDARY_HOTKEY = "f19"
 
     def __init__(self) -> None:
         super().__init__()
@@ -51,7 +52,7 @@ class DictationApp(tk.Tk):
 
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._session: ManualDictationSession | None = None
-        self._hotkey_listener: HotkeyListener | None = None
+        self._hotkey_listeners: list[HotkeyListener] = []
         self._automatic_local_model_pair: tuple[str, str] | None = None
         self._recording_indicator = FloatingRecordingIndicator(self)
         self._recording_meter: RecordingMeter | None = None
@@ -148,6 +149,16 @@ class DictationApp(tk.Tk):
             command=self._restart_hotkey_listener,
         ).grid(row=row, column=2, sticky="w", padx=(8, 0), pady=(0, 8))
         row += 1
+
+        if sys.platform == "darwin":
+            ttk.Label(config_frame, text="Secondary Hotkey").grid(
+                row=row, column=0, sticky="w", pady=(0, 8)
+            )
+            ttk.Label(
+                config_frame,
+                text=self._MACOS_SECONDARY_HOTKEY.upper(),
+            ).grid(row=row, column=1, sticky="w", pady=(0, 8))
+            row += 1
 
         button_row = ttk.Frame(config_frame)
         button_row.grid(row=row, column=0, columnspan=3, sticky="w", pady=(8, 0))
@@ -355,28 +366,44 @@ class DictationApp(tk.Tk):
     def _restart_hotkey_listener(self) -> None:
         self._start_hotkey_listener()
 
+    def _configured_hotkeys(self) -> tuple[str, ...]:
+        primary_hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY
+        if (
+            sys.platform != "darwin"
+            or primary_hotkey.lower() == self._MACOS_SECONDARY_HOTKEY
+        ):
+            return (primary_hotkey,)
+        return (primary_hotkey, self._MACOS_SECONDARY_HOTKEY)
+
+    def _stop_hotkey_listeners(self) -> None:
+        for listener in self._hotkey_listeners:
+            listener.stop()
+        self._hotkey_listeners.clear()
+
     def _restore_recording_target(self) -> None:
         if self._session is None or not self._session.recording:
             return
         self._session.restore_target_focus()
 
     def _start_hotkey_listener(self) -> None:
-        hotkey = self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY
-
-        if self._hotkey_listener is not None:
-            self._hotkey_listener.stop()
-            self._hotkey_listener = None
+        hotkeys = self._configured_hotkeys()
+        self._stop_hotkey_listeners()
 
         try:
-            self._hotkey_listener = build_hotkey_listener(
-                hotkey=hotkey,
-                callback=lambda: self._events.put(("toggle", "")),
-                release_callback=None,
+            for hotkey in hotkeys:
+                listener = build_hotkey_listener(
+                    hotkey=hotkey,
+                    callback=lambda: self._events.put(("toggle", "")),
+                    release_callback=None,
+                )
+                self._hotkey_listeners.append(listener)
+                listener.start()
+            hotkey_text = " or ".join(hotkeys)
+            self.status_var.set(
+                f"Idle. Press {hotkey_text} to start or stop recording."
             )
-            self._hotkey_listener.start()
-            self.status_var.set(f"Idle. Press {hotkey} to start or stop recording.")
         except HotkeyError as error:
-            self._hotkey_listener = None
+            self._stop_hotkey_listeners()
             self.status_var.set(f"Hotkey unavailable: {error}")
 
     def _show_recording_meter(self) -> None:
@@ -397,9 +424,7 @@ class DictationApp(tk.Tk):
         self._recording_indicator.update_level(level)
 
     def _on_close(self) -> None:
-        if self._hotkey_listener is not None:
-            self._hotkey_listener.stop()
-            self._hotkey_listener = None
+        self._stop_hotkey_listeners()
         if self._session is not None:
             self._session.close()
             self._session = None
