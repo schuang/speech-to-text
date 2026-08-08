@@ -79,6 +79,12 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
 }
 
 try {
+    $previousErrorActionPreference = $ErrorActionPreference
+    # Windows PowerShell 5.1 wraps native stderr as PowerShell error records.
+    # The import probe is expected to fail on a fresh or incomplete environment,
+    # so do not let ErrorActionPreference = "Stop" abort the repair path below.
+    $ErrorActionPreference = "Continue"
+
     if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
         $previousNativeErrorPreference = $PSNativeCommandUseErrorActionPreference
         $PSNativeCommandUseErrorActionPreference = $false
@@ -88,14 +94,45 @@ try {
     $packageInstalled = ($LASTEXITCODE -eq 0)
 }
 finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+
     if (Test-Path variable:previousNativeErrorPreference) {
         $PSNativeCommandUseErrorActionPreference = $previousNativeErrorPreference
     }
 }
 
 if ($createdVenv -or -not $packageInstalled) {
-    Write-Host "Installing project dependencies into the virtual environment..."
-    & $venvPython -m pip install -e $scriptRoot
+    try {
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+
+        & $venvPython -m pip --version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Bootstrapping pip in the virtual environment..."
+            & $venvPython -m ensurepip --upgrade
+            $pipBootstrapExitCode = $LASTEXITCODE
+        }
+        else {
+            $pipBootstrapExitCode = 0
+        }
+
+        if ($pipBootstrapExitCode -eq 0) {
+            Write-Host "Installing project dependencies into the virtual environment..."
+            & $venvPython -m pip install -e $scriptRoot
+            $dependencyInstallExitCode = $LASTEXITCODE
+        }
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($pipBootstrapExitCode -ne 0) {
+        throw "Could not install pip into the virtual environment."
+    }
+
+    if ($dependencyInstallExitCode -ne 0) {
+        throw "Project dependency installation failed."
+    }
 }
 
 if (-not $Provider) {
