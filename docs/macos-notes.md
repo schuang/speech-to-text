@@ -4,7 +4,7 @@ This note describes how the macOS text injection path works and how the app choo
 
 ## Existing audio files
 
-The macOS app can also transcribe an existing M4A, MP3, WAV, AAC, FLAC, Ogg, or Opus file. Click **Transcribe Audio File…**, choose the source, and select a `.txt` destination. This path uses Faster Whisper locally and does not use the microphone, text injector, Accessibility permission, or a cloud provider.
+The macOS app can also transcribe an existing M4A, MP3, WAV, AAC, FLAC, Ogg, or Opus file. In **Audio File Transcription**, choose the source and review the displayed default `.txt` destination. Both path fields are editable, and the **Choose…** buttons remain available for browsing. Click **Start Transcribing** when the paths are ready; file selection alone never starts processing. This path uses Faster Whisper locally and does not use the microphone, text injector, Accessibility permission, or a cloud provider.
 
 The equivalent command is:
 

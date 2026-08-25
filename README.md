@@ -309,7 +309,7 @@ CPU INT8 is the cross-platform configuration. Advanced Windows or Linux installa
 
 File transcription always uses the local Faster Whisper provider, even if the current shell is configured for a cloud provider. Faster Whisper's media decoder supports common formats including M4A, MP3, WAV, AAC, FLAC, Ogg, and Opus.
 
-From the desktop app, click **Transcribe Audio File…**, select the recording, and choose the destination `.txt` file. The conversion runs in the background. Enable **Identify speakers** before choosing the file to run the local speaker model.
+In the desktop app's **Audio File Transcription** section, click **Choose…** beside **Audio File**. The selected audio path and default output `.txt` path are displayed in editable fields. Review or edit either path, optionally choose a different output file or enable **Identify speakers**, then click **Start Transcribing**. Selecting a file does not start transcription.
 
 The same operation is available from Terminal:
 
@@ -334,6 +334,8 @@ Choose a different local Whisper model or spoken language when needed:
 ### Local speaker labels
 
 Speaker diarization answers “who spoke when” and labels turns as `Speaker 1`, `Speaker 2`, and so on. It does not infer people's names. The pyannote dependency is included in the project requirements. Ensure the environment is current and install the macOS media decoder:
+
+The output places a blank line between timestamped speaker turns for readability.
 
 ```bash
 brew install ffmpeg
@@ -506,7 +508,7 @@ Windows smoke test without opening the UI:
 
 The app only injects finalized transcription results. It does not auto-stop on silence. Finalized text is also copied to the clipboard.
 
-To transcribe an existing recording instead, optionally enable **Identify speakers**, click **Transcribe Audio File…**, and choose the input and output files.
+To transcribe an existing recording instead, choose the audio file in **Audio File Transcription**, review or change the displayed output path, optionally enable **Identify speakers**, and click **Start Transcribing**.
 
 ## Notes
 

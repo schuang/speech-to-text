@@ -80,7 +80,7 @@ class FileTranscriptionTests(unittest.TestCase):
 
         self.assertEqual(
             result.text,
-            "[00:00:00] Speaker 1: Hello there.\n"
+            "[00:00:00] Speaker 1: Hello there.\n\n"
             "[00:00:02] Speaker 2: Good morning.",
         )
 

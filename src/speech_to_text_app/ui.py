@@ -30,8 +30,8 @@ class DictationApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Speech To Text Dictation")
-        self.geometry("500x640")
-        self.minsize(430, 420)
+        self.geometry("620x720")
+        self.minsize(520, 560)
         self._icon_image: tk.PhotoImage | None = None
         self._set_window_icon()
 
@@ -49,6 +49,8 @@ class DictationApp(tk.Tk):
         )
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
         self.speaker_labels_var = tk.BooleanVar(value=False)
+        self.audio_file_var = tk.StringVar(value="")
+        self.output_file_var = tk.StringVar(value="")
         self._usb_microphones: tuple[InputDevice, ...] = usb_input_devices()
         self.microphone_var = tk.StringVar(value=input_device_name())
         self.status_var = tk.StringVar(value="Idle")
@@ -199,20 +201,71 @@ class DictationApp(tk.Tk):
             self._recording_meter.grid(row=0, column=3, padx=(12, 0), sticky="w")
 
         row += 1
-        file_row = ttk.Frame(config_frame)
-        file_row.grid(row=row, column=0, columnspan=3, sticky="w", pady=(10, 0))
-        self.file_button = ttk.Button(
-            file_row,
-            text="Transcribe Audio File…",
+        file_frame = ttk.LabelFrame(config_frame, text="Audio File Transcription")
+        file_frame.grid(
+            row=row,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            pady=(12, 0),
+        )
+        file_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(file_frame, text="Audio File").grid(
+            row=0, column=0, sticky="w", padx=(10, 8), pady=(10, 6)
+        )
+        ttk.Entry(
+            file_frame,
+            textvariable=self.audio_file_var,
+        ).grid(row=0, column=1, sticky="ew", pady=(10, 6))
+        self.audio_file_button = ttk.Button(
+            file_frame,
+            text="Choose…",
             command=self._choose_audio_file,
         )
-        self.file_button.grid(row=0, column=0, padx=(0, 12))
+        self.audio_file_button.grid(
+            row=0, column=2, padx=(8, 10), pady=(10, 6)
+        )
+
+        ttk.Label(file_frame, text="Output Text File").grid(
+            row=1, column=0, sticky="w", padx=(10, 8), pady=(0, 6)
+        )
+        ttk.Entry(
+            file_frame,
+            textvariable=self.output_file_var,
+        ).grid(row=1, column=1, sticky="ew", pady=(0, 6))
+        self.output_file_button = ttk.Button(
+            file_frame,
+            text="Choose…",
+            command=self._choose_output_file,
+            state="disabled",
+        )
+        self.output_file_button.grid(
+            row=1, column=2, padx=(8, 10), pady=(0, 6)
+        )
+
+        file_actions = ttk.Frame(file_frame)
+        file_actions.grid(
+            row=2,
+            column=0,
+            columnspan=3,
+            sticky="w",
+            padx=10,
+            pady=(2, 10),
+        )
         if self._provider == "local":
             ttk.Checkbutton(
-                file_row,
+                file_actions,
                 text="Identify speakers",
                 variable=self.speaker_labels_var,
-            ).grid(row=0, column=1, sticky="w")
+            ).grid(row=0, column=0, sticky="w", padx=(0, 12))
+        self.file_start_button = ttk.Button(
+            file_actions,
+            text="Start Transcribing",
+            command=self._start_file_transcription,
+            state="disabled",
+        )
+        self.file_start_button.grid(row=0, column=1, sticky="w")
 
         content = ttk.Frame(self, padding=(16, 0, 16, 16))
         content.grid(row=1, column=0, sticky="nsew")
@@ -315,9 +368,6 @@ class DictationApp(tk.Tk):
             )
             return
 
-        config = self._current_config()
-        if config is None:
-            return
         source_name = filedialog.askopenfilename(
             title="Choose an audio file",
             filetypes=(
@@ -329,26 +379,96 @@ class DictationApp(tk.Tk):
             return
 
         source = Path(source_name)
+        self.audio_file_var.set(str(source))
+        self.output_file_var.set(str(source.with_suffix(".txt")))
+        self.output_file_button.configure(state="normal")
+        self.file_start_button.configure(state="normal")
+        self.status_var.set(f"Ready to transcribe {source.name}.")
+
+    def _choose_output_file(self) -> None:
+        source_name = self.audio_file_var.get().strip()
+        if not source_name:
+            return
+
+        source = Path(source_name)
         output_name = filedialog.asksaveasfilename(
             title="Save transcript",
             initialdir=str(source.parent),
             initialfile=f"{source.stem}.txt",
             defaultextension=".txt",
             filetypes=(("Text files", "*.txt"), ("All files", "*.*")),
-            confirmoverwrite=True,
+            confirmoverwrite=False,
         )
         if not output_name:
             return
 
-        self.file_button.configure(state="disabled")
+        self.output_file_var.set(output_name)
+        self.file_start_button.configure(state="normal")
+
+    def _start_file_transcription(self) -> None:
+        if self._provider != "local":
+            messagebox.showerror(
+                "Local provider required",
+                "Audio-file transcription currently requires the local provider.",
+            )
+            return
+
+        source_name = self.audio_file_var.get().strip()
+        output_name = self.output_file_var.get().strip()
+        if not source_name or not output_name:
+            messagebox.showerror(
+                "Files required",
+                "Choose an audio file and output text file first.",
+            )
+            return
+
+        source = Path(source_name).expanduser()
+        output = Path(output_name).expanduser()
+        if not source.is_file():
+            messagebox.showerror("Audio file unavailable", f"File not found: {source}")
+            return
+        if source.resolve() == output.resolve():
+            messagebox.showerror(
+                "Invalid output file",
+                "The output text file must be different from the audio file.",
+            )
+            return
+        if output.exists() and not messagebox.askyesno(
+            "Replace output file?",
+            f"{output}\n\nThis file already exists. Replace it?",
+        ):
+            return
+
+        config = self._current_config()
+        if config is None:
+            return
+
+        self._set_file_transcription_running(True)
         self.status_var.set(f"Transcribing {source.name} locally...")
         worker = threading.Thread(
             target=self._transcribe_file_worker,
-            args=(source, Path(output_name), config, self.speaker_labels_var.get()),
+            args=(source, output, config, self.speaker_labels_var.get()),
             name="speech-to-text-file-transcription",
             daemon=True,
         )
         worker.start()
+
+    def _set_file_transcription_running(self, running: bool) -> None:
+        if running:
+            self.audio_file_button.configure(state="disabled")
+            self.output_file_button.configure(state="disabled")
+            self.file_start_button.configure(state="disabled")
+            return
+
+        has_source = bool(self.audio_file_var.get().strip())
+        has_output = bool(self.output_file_var.get().strip())
+        self.audio_file_button.configure(state="normal")
+        self.output_file_button.configure(
+            state="normal" if has_source else "disabled"
+        )
+        self.file_start_button.configure(
+            state="normal" if has_source and has_output else "disabled"
+        )
 
     def _transcribe_file_worker(
         self,
@@ -453,10 +573,10 @@ class DictationApp(tk.Tk):
                 self._clear_final_text()
                 if transcript:
                     self._append_final_text(str(transcript))
-                self.file_button.configure(state="normal")
+                self._set_file_transcription_running(False)
                 self.status_var.set(f"Transcript saved to {saved_path}")
             elif event_type == "file_error":
-                self.file_button.configure(state="normal")
+                self._set_file_transcription_running(False)
                 self.status_var.set(f"File transcription failed: {payload}")
                 messagebox.showerror("File transcription failed", str(payload))
 

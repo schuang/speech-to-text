@@ -42,7 +42,7 @@ class FileTranscript:
         if not self.speaker_labeled:
             return " ".join(block.text.strip() for block in self.blocks).strip()
 
-        return "\n".join(
+        return "\n\n".join(
             f"[{_format_timestamp(block.start)}] {block.speaker}: {block.text.strip()}"
             for block in self.blocks
         ).strip()
