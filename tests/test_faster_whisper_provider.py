@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import unittest
 import wave
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from speech_to_text_app.config import AppConfig
 from speech_to_text_app.providers.faster_whisper_utterance import (
@@ -68,6 +69,47 @@ class FasterWhisperUtteranceProviderTests(unittest.TestCase):
 
         self.assertEqual(transcript, "")
         load_model.assert_not_called()
+
+    def test_transcribes_media_file_with_word_timestamps(self) -> None:
+        model = SimpleNamespace()
+        model.transcribe = Mock(
+            return_value=(
+                iter(
+                    [
+                        SimpleNamespace(
+                            start=1.0,
+                            end=2.5,
+                            text=" hello world ",
+                            words=[
+                                SimpleNamespace(start=1.0, end=1.4, word=" hello"),
+                                SimpleNamespace(start=1.5, end=2.5, word=" world"),
+                            ],
+                        )
+                    ]
+                ),
+                object(),
+            )
+        )
+        provider = FasterWhisperUtteranceProvider(AppConfig(provider="local"))
+
+        with (
+            patch("pathlib.Path.is_file", return_value=True),
+            patch(
+                "speech_to_text_app.providers.faster_whisper_utterance._load_model",
+                return_value=model,
+            ),
+        ):
+            segments = provider.transcribe_file(
+                Path("meeting.m4a"),
+                word_timestamps=True,
+            )
+
+        self.assertEqual(segments[0].text, "hello world")
+        self.assertEqual(segments[0].words[1].text, " world")
+        self.assertEqual(segments[0].start, 1.0)
+        (called_audio,) = model.transcribe.call_args.args
+        self.assertTrue(str(called_audio).endswith("meeting.m4a"))
+        self.assertTrue(model.transcribe.call_args.kwargs["word_timestamps"])
 
 
 if __name__ == "__main__":

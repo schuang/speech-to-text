@@ -10,6 +10,8 @@ This project is a small desktop app written in Python. It records your speech be
 - Supports global hotkeys on macOS and Windows.
 - Shows a small Windows recording meter while audio is being captured.
 - Supports Google Cloud Speech-to-Text V2, OpenAI, and local Faster Whisper transcription models.
+- Converts existing audio files such as `.m4a`, `.mp3`, and `.wav` to UTF-8 text with the local Faster Whisper model.
+- Optionally labels speaker turns with a second local diarization model.
 - Detects the active provider from your environment.
 - Shows finalized transcripts in a local control window.
 - Pastes final transcript text into the active application, such as a terminal, VS Code, LibreOffice, Word, or a browser text field.
@@ -303,6 +305,77 @@ This means: “Please schedule a meeting for three o'clock tomorrow afternoon, a
 
 CPU INT8 is the cross-platform configuration. Advanced Windows or Linux installations with a compatible NVIDIA GPU can set `LOCAL_WHISPER_DEVICE=cuda` and a supported compute type such as `int8_float16`, but CUDA and cuDNN must be installed separately. If those libraries are not configured, keep the CPU defaults.
 
+## Transcribe an Audio File on macOS
+
+File transcription always uses the local Faster Whisper provider, even if the current shell is configured for a cloud provider. Faster Whisper's media decoder supports common formats including M4A, MP3, WAV, AAC, FLAC, Ogg, and Opus.
+
+From the desktop app, click **Transcribe Audio File…**, select the recording, and choose the destination `.txt` file. The conversion runs in the background. Enable **Identify speakers** before choosing the file to run the local speaker model.
+
+The same operation is available from Terminal:
+
+```bash
+./run.sh test.m4a
+./run.sh meeting.m4a --output meeting.txt
+```
+
+The output defaults to the audio filename with a `.txt` extension. Existing text files are preserved unless `--force` is supplied:
+
+```bash
+./run.sh meeting.m4a --output meeting.txt --force
+```
+
+Choose a different local Whisper model or spoken language when needed:
+
+```bash
+./run.sh interview.m4a --model small.en --language en-US
+./run.sh interview-zh.m4a --model small --language zh
+```
+
+### Local speaker labels
+
+Speaker diarization answers “who spoke when” and labels turns as `Speaker 1`, `Speaker 2`, and so on. It does not infer people's names. The pyannote dependency is included in the project requirements. Ensure the environment is current and install the macOS media decoder:
+
+```bash
+brew install ffmpeg
+source .venv/bin/activate
+pip install -e .
+```
+
+Then accept the access terms for the [pyannote Community-1 model](https://huggingface.co/pyannote/speaker-diarization-community-1), create a Hugging Face access token, and run:
+
+```bash
+export HF_TOKEN="your-hugging-face-token"
+./run.sh interview.m4a --speaker-labels
+```
+
+If the speaker count is known, supplying it can improve the result:
+
+```bash
+./run.sh interview.m4a --num-speakers 2
+```
+
+When `--num-speakers` is omitted, pyannote estimates the number of speakers automatically. Use `--speaker-labels` to enable that automatic mode:
+
+```bash
+./run.sh interview.m4a --speaker-labels
+```
+
+Whisper and pyannote both run on the Mac. They download their model files on first use and can use the cached files offline afterward. Speaker labeling is substantially slower and uses more memory than transcription alone. To use a pyannote model already stored on disk, set `LOCAL_DIARIZATION_MODEL` to that directory.
+
+On macOS, the app decodes audio through Faster Whisper's bundled PyAV decoder and passes a 16 kHz in-memory waveform to pyannote. This avoids dependency on TorchCodec's dynamic FFmpeg library lookup; the Homebrew `ffmpeg` executable remains useful for general media inspection and conversion.
+
+Speaker diarization automatically uses Apple's MPS accelerator when PyTorch can access it and displays progress for segmentation, embeddings, and clustering. To force the CPU path or tune accelerator batch sizes:
+
+```bash
+export LOCAL_DIARIZATION_DEVICE=cpu
+export LOCAL_DIARIZATION_SEGMENTATION_BATCH_SIZE=1
+export LOCAL_DIARIZATION_EMBEDDING_BATCH_SIZE=1
+```
+
+The default batch size is 16 on MPS or CUDA and 1 on CPU. A 56-minute recording can still take a while, especially on CPU; the progress display includes an estimated time remaining.
+
+Terminal file conversion displays a progress bar for Faster Whisper transcription as well, followed by separate pyannote progress bars when speaker labels are enabled.
+
 ## Run
 
 Set your provider environment in the current shell, then start the app.
@@ -433,6 +506,8 @@ Windows smoke test without opening the UI:
 
 The app only injects finalized transcription results. It does not auto-stop on silence. Finalized text is also copied to the clipboard.
 
+To transcribe an existing recording instead, optionally enable **Identify speakers**, click **Transcribe Audio File…**, and choose the input and output files.
+
 ## Notes
 
 - The launcher scripts default to the local provider; use their provider option to select GCP or OpenAI.
@@ -465,6 +540,8 @@ The app only injects finalized transcription results. It does not auto-stop on s
 - The GCP backend transcribes one recorded utterance at a time.
 - The OpenAI backend uploads one recorded WAV utterance and emits finalized transcripts only.
 - The Faster Whisper backend processes recorded utterances locally and caches loaded models for reuse between recordings.
+- Audio-file conversion always uses Faster Whisper locally and never uploads the selected file.
+- Speaker labels use the local pyannote Community-1 model when requested; the labels are anonymous and may be imperfect for overlapping speech or noisy recordings.
 
 ## Project Layout
 

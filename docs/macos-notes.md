@@ -2,6 +2,18 @@
 
 This note describes how the macOS text injection path works and how the app chooses between Accessibility-based insertion and clipboard-based paste.
 
+## Existing audio files
+
+The macOS app can also transcribe an existing M4A, MP3, WAV, AAC, FLAC, Ogg, or Opus file. Click **Transcribe Audio File…**, choose the source, and select a `.txt` destination. This path uses Faster Whisper locally and does not use the microphone, text injector, Accessibility permission, or a cloud provider.
+
+The equivalent command is:
+
+```bash
+./run.sh test.m4a --output test.txt
+```
+
+Speaker labeling uses the local pyannote Community-1 model when **Identify speakers** is enabled. See the README's **Local speaker labels** section for the macOS installation and first-download steps.
+
 ## Overall model
 
 On macOS, the app treats text insertion as a target-sensitive operation.

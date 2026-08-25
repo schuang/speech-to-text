@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import queue
 import sys
+import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .config import (
     AppConfig,
@@ -29,7 +30,7 @@ class DictationApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Speech To Text Dictation")
-        self.geometry("460x560")
+        self.geometry("500x640")
         self.minsize(430, 420)
         self._icon_image: tk.PhotoImage | None = None
         self._set_window_icon()
@@ -47,6 +48,7 @@ class DictationApp(tk.Tk):
             value=default_config.model or self._provider_profile.default_model
         )
         self.hotkey_var = tk.StringVar(value=default_config.hotkey)
+        self.speaker_labels_var = tk.BooleanVar(value=False)
         self._usb_microphones: tuple[InputDevice, ...] = usb_input_devices()
         self.microphone_var = tk.StringVar(value=input_device_name())
         self.status_var = tk.StringVar(value="Idle")
@@ -196,6 +198,22 @@ class DictationApp(tk.Tk):
             self._recording_meter = RecordingMeter(button_row)
             self._recording_meter.grid(row=0, column=3, padx=(12, 0), sticky="w")
 
+        row += 1
+        file_row = ttk.Frame(config_frame)
+        file_row.grid(row=row, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        self.file_button = ttk.Button(
+            file_row,
+            text="Transcribe Audio File…",
+            command=self._choose_audio_file,
+        )
+        self.file_button.grid(row=0, column=0, padx=(0, 12))
+        if self._provider == "local":
+            ttk.Checkbutton(
+                file_row,
+                text="Identify speakers",
+                variable=self.speaker_labels_var,
+            ).grid(row=0, column=1, sticky="w")
+
         content = ttk.Frame(self, padding=(16, 0, 16, 16))
         content.grid(row=1, column=0, sticky="nsew")
         content.columnconfigure(0, weight=1)
@@ -222,41 +240,9 @@ class DictationApp(tk.Tk):
         if self._session is not None and (self._session.recording or self._session.transcribing):
             return
 
-        provider_values = {
-            key: value.get().strip()
-            for key, value in self._provider_field_vars.items()
-        }
-        validation_error = self._provider_profile.validate(provider_values)
-        if validation_error:
-            messagebox.showerror("Provider unavailable", validation_error)
+        config = self._current_config()
+        if config is None:
             return
-
-        language_code = language_code_for_selection(self.language_var.get())
-        selected_model = self.model_var.get().strip() or self._provider_profile.default_model
-        if self._provider == "local":
-            compatible_model = compatible_local_model(selected_model, language_code)
-            if compatible_model != selected_model:
-                self._automatic_local_model_pair = (
-                    selected_model,
-                    compatible_model,
-                )
-                selected_model = compatible_model
-                self.model_var.set(selected_model)
-
-        config = AppConfig(
-            provider=self._provider,
-            project_id=provider_values.get("project_id", ""),
-            language_code=language_code,
-            model=selected_model,
-            hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
-            recognizer_location=provider_values.get("recognizer_location", "us") or "us",
-            openai_api_key=provider_values.get("openai_api_key", ""),
-            local_device=provider_values.get("local_device", "cpu") or "cpu",
-            local_compute_type=(
-                provider_values.get("local_compute_type", "int8") or "int8"
-            ),
-            input_device_index=self._selected_input_device_index(),
-        )
 
         try:
             injector = build_text_injector(delay_seconds=config.typing_delay_seconds)
@@ -283,6 +269,106 @@ class DictationApp(tk.Tk):
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.status_var.set("Starting recording...")
+
+    def _current_config(self) -> AppConfig | None:
+        provider_values = {
+            key: value.get().strip()
+            for key, value in self._provider_field_vars.items()
+        }
+        validation_error = self._provider_profile.validate(provider_values)
+        if validation_error:
+            messagebox.showerror("Provider unavailable", validation_error)
+            return
+
+        language_code = language_code_for_selection(self.language_var.get())
+        selected_model = self.model_var.get().strip() or self._provider_profile.default_model
+        if self._provider == "local":
+            compatible_model = compatible_local_model(selected_model, language_code)
+            if compatible_model != selected_model:
+                self._automatic_local_model_pair = (
+                    selected_model,
+                    compatible_model,
+                )
+                selected_model = compatible_model
+                self.model_var.set(selected_model)
+
+        return AppConfig(
+            provider=self._provider,
+            project_id=provider_values.get("project_id", ""),
+            language_code=language_code,
+            model=selected_model,
+            hotkey=self.hotkey_var.get().strip() or self._DEFAULT_HOTKEY,
+            recognizer_location=provider_values.get("recognizer_location", "us") or "us",
+            openai_api_key=provider_values.get("openai_api_key", ""),
+            local_device=provider_values.get("local_device", "cpu") or "cpu",
+            local_compute_type=(
+                provider_values.get("local_compute_type", "int8") or "int8"
+            ),
+            input_device_index=self._selected_input_device_index(),
+        )
+
+    def _choose_audio_file(self) -> None:
+        if self._provider != "local":
+            messagebox.showerror(
+                "Local provider required",
+                "Audio-file transcription currently requires the local provider.",
+            )
+            return
+
+        config = self._current_config()
+        if config is None:
+            return
+        source_name = filedialog.askopenfilename(
+            title="Choose an audio file",
+            filetypes=(
+                ("Audio files", "*.m4a *.mp3 *.wav *.aac *.flac *.ogg *.opus"),
+                ("All files", "*.*"),
+            ),
+        )
+        if not source_name:
+            return
+
+        source = Path(source_name)
+        output_name = filedialog.asksaveasfilename(
+            title="Save transcript",
+            initialdir=str(source.parent),
+            initialfile=f"{source.stem}.txt",
+            defaultextension=".txt",
+            filetypes=(("Text files", "*.txt"), ("All files", "*.*")),
+            confirmoverwrite=True,
+        )
+        if not output_name:
+            return
+
+        self.file_button.configure(state="disabled")
+        self.status_var.set(f"Transcribing {source.name} locally...")
+        worker = threading.Thread(
+            target=self._transcribe_file_worker,
+            args=(source, Path(output_name), config, self.speaker_labels_var.get()),
+            name="speech-to-text-file-transcription",
+            daemon=True,
+        )
+        worker.start()
+
+    def _transcribe_file_worker(
+        self,
+        source: Path,
+        output: Path,
+        config: AppConfig,
+        identify_speakers: bool,
+    ) -> None:
+        try:
+            from .file_transcription import save_transcript, transcribe_audio_file
+
+            transcript = transcribe_audio_file(
+                source,
+                config,
+                identify_speakers=identify_speakers,
+            )
+            saved_path = save_transcript(transcript, output, overwrite=True)
+            self._events.put(("file_done", (transcript.text, saved_path)))
+        except Exception as error:  # noqa: BLE001
+            self._events.put(("file_error", str(error)))
 
     def _on_language_selected(self, _event: object) -> None:
         if self._provider != "local":
@@ -362,6 +448,17 @@ class DictationApp(tk.Tk):
                 self._append_final_text(payload)
             elif event_type == "level":
                 self._update_recording_meter(float(payload))
+            elif event_type == "file_done":
+                transcript, saved_path = payload
+                self._clear_final_text()
+                if transcript:
+                    self._append_final_text(str(transcript))
+                self.file_button.configure(state="normal")
+                self.status_var.set(f"Transcript saved to {saved_path}")
+            elif event_type == "file_error":
+                self.file_button.configure(state="normal")
+                self.status_var.set(f"File transcription failed: {payload}")
+                messagebox.showerror("File transcription failed", str(payload))
 
         self.after(100, self._pump_events)
 
